@@ -1,3 +1,7 @@
-output
+pikit
 pikit-graphql-server
+!src/deploy/docker/pikit-graphql-server
 pikit-restful-server
+!src/deploy/docker/pikit-restful-server
+pikit-web
+!src/deploy/docker/pikit-web
