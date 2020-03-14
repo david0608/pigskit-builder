@@ -7,13 +7,13 @@ REST="\x1B[0m"
 function build-rust-repo() {
     make build-rust repo=$1
     mkdir -p pikit/app/$1
-    cp $1/target/release/$1 pikit/app/$1
+    cp src/$1/target/release/$1 pikit/app/$1
 }
 
 function build-node-repo() {
     make build-node repo=$1
     mkdir -p pikit/app/$1
-    cp -r $1/dist/* pikit/app/$1
+    cp -r src/$1/dist/* pikit/app/$1
 }
 
 rm -rf pikit && mkdir pikit

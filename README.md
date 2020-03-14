@@ -25,3 +25,21 @@ docker ps -a                # 檢視運行中的 container
 ```
 ./build.bash
 ```
+
+## 本地測試
+
+```
+cd pikit/docker && make run         # 運行服務
+Ctrl+c && make kill                 # 終止服務
+```
+
+## 佈署服務
+
+上傳檔案與登入雲端主機須提供 SSH 金鑰，這裡默認金鑰位置為 ~/.ssh/AwsEcsKey.pem
+
+```
+make awsscp                         # 上傳所需的檔案
+make awslogin                       # 登入雲端主機
+cd ~/pikit/docker && make run-d     # 運行服務
+make kill                           # 終止服務
+```

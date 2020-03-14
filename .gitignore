@@ -5,3 +5,4 @@ pikit-restful-server
 !src/deploy/docker/pikit-restful-server
 pikit-web
 !src/deploy/docker/pikit-web
+.DS_Store
