@@ -1,6 +1,6 @@
-# PIKIT Service Release Builder  
+# Pigskit Service Release Builder  
 
-利用本專案可以建置用於編譯的環境並編譯 PIKIT service release。  
+利用本專案可以建置用於編譯的環境並編譯 Pigskit service release。  
 
 ## 建置 Docker 容器  
 
@@ -29,7 +29,7 @@ docker ps -a                # 檢視運行中的 container
 ## 本地測試
 
 ```
-cd pikit/docker && make run         # 運行服務
+cd pigskit/docker && make run         # 運行服務
 Ctrl+c && make kill                 # 終止服務
 ```
 
@@ -40,6 +40,6 @@ Ctrl+c && make kill                 # 終止服務
 ```
 make awsscp                         # 上傳所需的檔案
 make awslogin                       # 登入雲端主機
-cd ~/pikit/docker && make run-d     # 運行服務
+cd ~/pigskit/docker && make run-d   # 運行服務
 make kill                           # 終止服務
 ```

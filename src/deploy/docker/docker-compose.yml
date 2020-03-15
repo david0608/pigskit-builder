@@ -12,31 +12,31 @@ services:
             - ../postgres/postgres.conf:/etc/postgresql/postgresql.conf
         environment:
             POSTGRES_HOST_AUTH_METHOD: trust
-    pikit-graphql-server:
-        container_name: pikit-graphql-server
-        build: pikit-graphql-server
+    pigskit-graphql-server:
+        container_name: pigskit-graphql-server
+        build: pigskit-graphql-server
         expose:
             - "8000"
         volumes:
-            - ../app/pikit-graphql-server:/app
+            - ../app/pigskit-graphql-server:/app
         depends_on:
             - postgres-server
-    pikit-restful-server:
-        container_name: pikit-restful-server
-        build: pikit-restful-server
+    pigskit-restful-server:
+        container_name: pigskit-restful-server
+        build: pigskit-restful-server
         expose:
             - "8001"
         volumes:
-            - ../app/pikit-restful-server:/app
+            - ../app/pigskit-restful-server:/app
         depends_on:
             - postgres-server
-    pikit-web:
-        container_name: pikit-web
-        build: pikit-web
+    pigskit-web:
+        container_name: pigskit-web
+        build: pigskit-web
         ports:
             - "80:80"
         volumes:
-            - ../app/pikit-web:/app
+            - ../app/pigskit-web:/app
         depends_on: 
-            - pikit-graphql-server
-            - pikit-restful-server
+            - pigskit-graphql-server
+            - pigskit-restful-server

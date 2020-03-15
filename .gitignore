@@ -1,8 +1,8 @@
-pikit
-pikit-graphql-server
-!src/deploy/docker/pikit-graphql-server
-pikit-restful-server
-!src/deploy/docker/pikit-restful-server
-pikit-web
-!src/deploy/docker/pikit-web
+pigskit
+pigskit-graphql-server
+!src/deploy/docker/pigskit-graphql-server
+pigskit-restful-server
+!src/deploy/docker/pigskit-restful-server
+pigskit-web
+!src/deploy/docker/pigskit-web
 .DS_Store
