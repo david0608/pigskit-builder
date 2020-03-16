@@ -26,10 +26,65 @@ docker ps -a                # 檢視運行中的 container
 ./build.bash
 ```
 
+## SSL 證書
+
+### Letsencrypt  
+
+參考網路資源為雲端主機取得 Letsencrypt 證書後，需修改檔案的擁有者才能在 pigskit-web container 中存取到  
+
+```
+$ sudo su
+$ cp /etc/letsencrypt/archive/pigskit.com/* /home/ubuntu/certificate
+$ cd /home/ubuntu/certificate
+$ chown ubuntu:ubuntu *
+$ exit
+```
+
+### Self-signed
+
+在本地進行測試時可以為機器產生 self-signed SSL 證書供開發使用：
+
+```
+$ cd # path/to/pigskit-builder/certificate
+$ openssl req -nodes -new -x509 -keyout privkey.pem -out cert.pem
+
+```
+
+### 運行  
+
+Pigskit-web server 會嘗試檢查所需的檔案是否存在，然後決定是以 https with Letsencrypt、self-signed 或 http 運行。  
+若欲以 https with Letsencrypt 運行，例如實際佈署的服務，請確認主機已取得 Letsencrypt 證書，並且將相關檔案放到如下位置：  
+
+```
+/home/ubuntu
+    |-pigskit
+    |   |-app
+    |   |-docker
+    |   |-postgres
+    |-certificate
+    |   |-privkey.pem           # server key
+    |   |-cert.pem              # server cert
+    |   |-chain.pem             # ca
+    |...
+```
+
+若欲以 https with self-signed 運行，例如在本地進行測試，請確認本機已取得 self-signed 證書，並將相關檔案放到如下位置：  
+
+```
+pigskit-builder
+    |-certificate
+    |   |-privkey.pem           # server key
+    |   |-cert.pem              # server cert
+    |-pigskit
+    |...
+```
+
+若上述兩個情況都不滿足，則 pigskit-web server 會以 http 運行。  
+
 ## 本地測試
 
 ```
-cd pigskit/docker && make run         # 運行服務
+cd pigskit/docker && make run       # 運行服務
 Ctrl+c && make kill                 # 終止服務
 ```
 

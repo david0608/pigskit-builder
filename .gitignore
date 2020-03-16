@@ -5,4 +5,5 @@ pigskit-restful-server
 !src/deploy/docker/pigskit-restful-server
 pigskit-web
 !src/deploy/docker/pigskit-web
+certificate
 .DS_Store
