@@ -1,1 +1,0 @@
-psql -U postgres -d postgres -f remove.sql
