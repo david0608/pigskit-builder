@@ -29,7 +29,8 @@ EXECUTE PROCEDURE errors_code_auto_upper();
 INSERT INTO errors (code, name, message) VALUES
     ('C0000', 'unknown', 'Unknown error occurred.'),
     ('C0001', 'permission_denied', 'Permission denied.'),
-    ('C0002', 'not_found', 'Not found.');
+    ('C0002', 'not_found', 'Not found.'),
+    ('C0003', 'text_not_null', 'value for domain text_nn violates check constraint "text_not_null"');
 
 
 

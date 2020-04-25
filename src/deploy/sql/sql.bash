@@ -4,16 +4,20 @@ function run_sql() {
 
 declare -a database_objs
 database_objs=(
+    inits
     permission
     errors
     users
     sessions
+    customize
+    product
     shops
     stores
 )
 
 if [[ $1 == "add-all" ]]; then
-    psql -U postgres -d postgres -c 'Create Extension If Not Exists "uuid-ossp"'
+    psql -U postgres -d postgres -c 'CREATE EXTENSION IF NOT EXISTS "uuid-ossp"'
+    psql -U postgres -d postgres -c 'CREATE EXTENSION IF NOT EXISTS "hstore"'
 
     for (( i = 0; i < ${#database_objs[*]}; i++ ))
     do

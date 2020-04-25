@@ -40,11 +40,11 @@ CREATE TABLE store_user (
 
 -- Stores errors.
 INSERT INTO errors (code, name, message) VALUES
-    ('C4001', 'stores_shop_id_name_upper_key', 'Store name already been used.'),
-    ('C4002', 'stores_name_notnull', 'Invalid store name.'),
-    ('C4003', 'store_user_store_id_user_id_key', 'Pair of store_id and user_id already existed.'),
-    ('C4004', 'store_user_user_id_fkey', 'user_id not existed.'),
-    ('C4005', 'store_user_update_authority_failed', 'Failed to update store_user authority.');
+    ('C6001', 'stores_shop_id_name_upper_key', 'Store name already been used.'),
+    ('C6002', 'stores_name_notnull', 'Invalid store name.'),
+    ('C6003', 'store_user_store_id_user_id_key', 'Pair of store_id and user_id already existed.'),
+    ('C6004', 'store_user_user_id_fkey', 'user_id not existed.'),
+    ('C6005', 'store_user_update_authority_failed', 'Failed to update store_user authority.');
 
 
 

@@ -7,7 +7,7 @@ DROP FUNCTION add_store_member;
 DROP FUNCTION test_create_store;
 DROP FUNCTION create_store;
 
-DELETE FROM errors WHERE code LIKE 'C4%';
+DELETE FROM errors WHERE code LIKE 'C6%';
 
 DROP TABLE store_user;
 
