@@ -1,8 +1,8 @@
 -- Sessions table.
 CREATE TABLE sessions (
-    id                  UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    user_id             UUID REFERENCES users(id) NOT NULL,
-    latest_access       TIMESTAMPTZ DEFAULT NOW()
+    id                  UUID_NN PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id             UUID_NN REFERENCES users(id),
+    latest_access       TS_NN DEFAULT NOW()
 );
 
 
@@ -34,40 +34,11 @@ CREATE OR REPLACE FUNCTION signin_user (
     END;
 $$ LANGUAGE plpgsql;
 
-CREATE OR REPLACE FUNCTION test_signin_user (
-    username TEXT,
-    password TEXT
-) RETURNS VOID AS $$
-    BEGIN
-        PERFORM signin_user(username, password);
-        RAISE INFO 'Successfully signed in.';
-    EXCEPTION WHEN OTHERS THEN
-        RAISE INFO 'error_code:%, message:%', SQLSTATE, SQLERRM;
-    END;
-$$ LANGUAGE plpgsql;
-
-DO $$
-    BEGIN
-        RAISE INFO 'Testing function signin_user and error handling.';
-        
-        -- Success.
-        PERFORM test_signin_user('david0608', '123123');
-        -- Success.
-        PERFORM test_signin_user('alice0710', '123123');
-        -- Fail. Invalid username.
-        PERFORM test_signin_user('someone12', '123123');
-        -- Fail. Invalid password.
-        PERFORM test_signin_user('someone123', '12312');
-
-        RAISE INFO 'Done!';
-    END;
-$$ LANGUAGE plpgsql;
-
 
 
 -- Signout user.
 CREATE OR REPLACE FUNCTION signout_user (
-    session_id UUID
+    session_id UUID_NN
 ) RETURNS VOID AS $$
     BEGIN
         DELETE FROM sessions WHERE id = session_id;
@@ -78,7 +49,7 @@ $$ LANGUAGE plpgsql;
 
 -- Get user_id from session_id.
 CREATE OR REPLACE FUNCTION get_session_user (
-    session_id UUID,
+    session_id UUID_NN,
     OUT user_id UUID
 ) AS $$
     BEGIN
@@ -86,34 +57,5 @@ CREATE OR REPLACE FUNCTION get_session_user (
         IF user_id IS NULL THEN
             PERFORM raise_error('session_expired');
         END IF;
-    END;
-$$ LANGUAGE plpgsql;
-
-CREATE OR REPLACE FUNCTION test_get_session_user (
-    session_id UUID
-) RETURNS VOID AS $$
-    BEGIN
-        PERFORM get_session_user(session_id);
-        RAISE INFO 'Successfully get user_id.';
-    EXCEPTION WHEN OTHERS THEN
-        RAISE INFO 'error_code:%, message:%', SQLSTATE, SQLERRM;
-    END;
-$$ LANGUAGE plpgsql;
-
-DO $$
-    DECLARE
-        session_id UUID;
-    BEGIN
-        RAISE INFO 'Testing function get_session_user and error handling.';
-
-        SELECT signin_user('david0608', '123123') INTO session_id;
-        -- Success.
-        PERFORM test_get_session_user(session_id);
-
-        PERFORM signout_user(session_id);
-        -- Fail. Session expired.
-        PERFORM test_get_session_user(session_id);
-
-        RAISE INFO 'Done!';
     END;
 $$ LANGUAGE plpgsql;

@@ -1,8 +1,15 @@
 -- Option type.
 CREATE TYPE OPTION AS (
+    id                  UUID_NN,
     name                TEXT_NN,
     price               INT_NN
 );
+
+--Domain OPTION_NN
+CREATE DOMAIN OPTION_NN AS OPTION
+    CONSTRAINT option_not_null CHECK (
+        VALUE IS NOT NULL
+    );
 
 
 
@@ -12,7 +19,7 @@ CREATE OR REPLACE FUNCTION new_option (
     price INT_NN
 ) RETURNS OPTION AS $$
     BEGIN
-        RETURN (name, price)::OPTION;
+        RETURN (uuid_generate_v4(), name, price)::OPTION;
     END;
 $$ LANGUAGE plpgsql;
 
@@ -20,17 +27,25 @@ $$ LANGUAGE plpgsql;
 
 -- Customize type.
 CREATE TYPE CUSTOMIZE AS (
+    id                  UUID_NN,
     name                TEXT_NN,
     options             HSTORE_NN,
     latest_update       TS_NN
 );
+
+-- Domain CUSTOMIZE_NN.
+CREATE DOMAIN CUSTOMIZE_NN AS CUSTOMIZE
+    CONSTRAINT customize_not_null CHECK (
+        VALUE IS NOT NULL
+    );
 
 
 
 -- Customize errors.
 INSERT INTO errors (code, name, message) VALUES
     ('C3001', 'customize_duplicated_option', 'Option already existed for the customize.'),
-    ('C3002', 'customize_option_not_found', 'Option not found for the customize.');
+    ('C3002', 'customize_option_not_found', 'Option for the customize not found.'),
+    ('C3003', 'customize_option_mismatch', 'Option for the customize mismatch.');
 
 
 
@@ -39,7 +54,7 @@ CREATE OR REPLACE FUNCTION new_customize (
     name TEXT_NN
 ) RETURNS CUSTOMIZE AS $$
     BEGIN
-        RETURN (name, '', now())::CUSTOMIZE;
+        RETURN (uuid_generate_v4(), name, '', now())::CUSTOMIZE;
     END;
 $$ LANGUAGE plpgsql;
 
@@ -47,8 +62,8 @@ $$ LANGUAGE plpgsql;
 
 -- Create a option for the customize.
 CREATE OR REPLACE FUNCTION customize_create_option (
-    INOUT customize CUSTOMIZE,
-    option OPTION
+    INOUT customize CUSTOMIZE_NN,
+    option OPTION_NN
 ) AS $$
     BEGIN
         IF (customize.options ? upper(option.name)) THEN
@@ -59,27 +74,19 @@ CREATE OR REPLACE FUNCTION customize_create_option (
     END;
 $$ LANGUAGE plpgsql;
 
-CREATE OR REPLACE FUNCTION test_customize_create_option (
-    INOUT customize CUSTOMIZE,
-    option OPTION
-) AS $$
-    BEGIN
-        customize = customize_create_option(customize, option);
-        RAISE INFO 'Successfully inserted option.';
-    EXCEPTION WHEN OTHERS THEN
-        RAISE INFO 'error_code:%, message:%', SQLSTATE, SQLERRM;
-    END;
-$$ LANGUAGE plpgsql;
-
 
 
 -- Read option of the customize.
 CREATE OR REPLACE FUNCTION customize_read_option (
-    customize CUSTOMIZE,
-    option_name TEXT_NN
-) RETURNS OPTION AS $$
+    customize CUSTOMIZE_NN,
+    option_name TEXT_NN,
+    OUT option OPTION
+) AS $$
     BEGIN
-        RETURN (customize.options -> upper(option_name))::OPTION;
+        option = (customize.options -> upper(option_name))::OPTION;
+        IF option IS NULL THEN
+            PERFORM raise_error('customize_option_not_found');
+        END IF;
     END;
 $$ LANGUAGE plpgsql;
 
@@ -87,19 +94,27 @@ $$ LANGUAGE plpgsql;
 
 -- Update option of a customize.
 CREATE OR REPLACE FUNCTION customize_update_option (
-    INOUT customize CUSTOMIZE,
-    option OPTION,
+    INOUT customize CUSTOMIZE_NN,
+    option OPTION_NN,
     new_name TEXT
 ) AS $$
+    DECLARE
+        old_option OPTION;
     BEGIN
-        IF new_name IS NOT NULL AND new_name != '' AND (customize.options ? upper(new_name)) THEN
-            PERFORM raise_error('customize_duplicated_option');
+        old_option = customize_read_option(customize, option.name);
+        IF option.id != old_option.id THEN
+            PERFORM raise_error('customize_option_mismatch');
         END IF;
 
-        customize.options = customize.options - upper(option.name);
-
         IF new_name IS NOT NULL AND new_name != '' THEN
-            option.name = new_name;
+            IF customize.options ? upper(new_name) THEN
+                PERFORM raise_error('customize_duplicated_option');
+            ELSE
+                customize.options = customize.options - upper(option.name);
+                option.name = new_name;
+            END IF;
+        ELSE
+            customize.options = customize.options - upper(option.name);
         END IF;
 
         customize.options = customize.options || hstore(upper(option.name), format('%s', option));
@@ -107,75 +122,26 @@ CREATE OR REPLACE FUNCTION customize_update_option (
     END;
 $$ LANGUAGE plpgsql;
 
-CREATE OR REPLACE FUNCTION test_customize_update_option (
-    INOUT customize CUSTOMIZE,
-    option OPTION,
-    new_name TEXT
-) AS $$
-    BEGIN
-        customize = customize_update_option(customize, option, new_name);
-        RAISE INFO 'Succeddfully updated option.';
-    EXCEPTION WHEN OTHERS THEN
-        RAISE INFO 'error_code:%, message:%', SQLSTATE, SQLERRM;
-    END;
-$$ LANGUAGE plpgsql;
-
 
 
 -- Drop option of a customize.
 CREATE OR REPLACE FUNCTION customize_delete_option (
-    INOUT customize CUSTOMIZE,
-    name TEXT
+    INOUT customize CUSTOMIZE_NN,
+    name TEXT_NN,
+    id UUID_NN
 ) AS $$
-    BEGIN
-        customize.options = customize.options - upper(name);
-        customize.latest_update = now();
-    END;
-$$ LANGUAGE plpgsql;
-
-
-
--- Test customize functions and error handling.
-DO $$
     DECLARE
-        cus CUSTOMIZE;
+        option OPTION;
     BEGIN
-        RAISE INFO 'Testing customize functions and error handling.';
+        option = (customize.options -> upper(name))::OPTION;
 
-        cus = new_customize('customize_1');
-        
-        -- Successfully insert.
-        cus = test_customize_create_option(
-            cus,
-            new_option('option_1', '100')
-        );
-
-        -- Fail. Duplicated option name.
-        cus = test_customize_create_option(
-            cus,
-            new_option('OPTION_1', '200')
-        );
-        
-        -- Successfully update.
-        cus = test_customize_update_option(
-            cus,
-            new_option('option_1', '200'),
-            'option_2'
-        );
-
-        -- Successfully delete.
-        cus = customize_delete_option(
-            cus,
-            'option_1'
-        );
-
-        -- Fail. Duplicated option.
-        cus = test_customize_update_option(
-            cus,
-            new_option('option_1', '300'),
-            'option_2'
-        );
-
-        RAISE INFO 'Done!';
+        IF option IS NULL THEN
+            PERFORM raise_error('customize_option_not_found');
+        ELSIF option.id != id THEN
+            PERFORM raise_error('customize_option_mismatch');
+        ELSE
+            customize.options = customize.options - upper(name);
+            customize.latest_update = now();
+        END IF;
     END;
 $$ LANGUAGE plpgsql;

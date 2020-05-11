@@ -1,10 +1,9 @@
-DROP FUNCTION test_set_store_member_authority;
 DROP FUNCTION set_store_member_authority;
 
-DROP FUNCTION test_add_store_member;
 DROP FUNCTION add_store_member;
 
-DROP FUNCTION test_create_store;
+DROP FUNCTION check_store_user_authority;
+
 DROP FUNCTION create_store;
 
 DELETE FROM errors WHERE code LIKE 'C6%';

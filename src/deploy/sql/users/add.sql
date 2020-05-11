@@ -1,6 +1,6 @@
 -- Users table.
 CREATE TABLE users (
-    id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id              UUID_NN PRIMARY KEY DEFAULT uuid_generate_v4(),
     username        TEXT_NN UNIQUE,
     password        TEXT_NN,
     name            TEXT_NN,
@@ -51,43 +51,5 @@ CREATE OR REPLACE FUNCTION register_user (
             GET STACKED DIAGNOSTICS c_name = CONSTRAINT_NAME;
             PERFORM raise_error(c_name);
         END;
-    END;
-$$ LANGUAGE plpgsql;
-
-CREATE OR REPLACE FUNCTION test_register_user (
-    username TEXT_NN,
-    password TEXT_NN,
-    name TEXT_NN,
-    email TEXT_NN,
-    phone TEXT_NN
-) RETURNS VOID AS $$
-    BEGIN
-        PERFORM register_user(username, password, name, email, phone);
-        RAISE INFO 'Successfully registered user.';
-    EXCEPTION WHEN OTHERS THEN
-        BEGIN
-            RAISE INFO 'error_code:%, message:%', SQLSTATE, SQLERRM;
-        END;
-    END;
-$$ LANGUAGE plpgsql;
-
-DO $$
-    BEGIN
-        RAISE INFO 'Testing function register_user and error handling.';
-
-        -- Success.
-        PERFORM test_register_user('david0608', '123123', 'David', 'david0608@gmail.com', '0912047175');
-        -- Success.
-        PERFORM test_register_user('alice0710', '123123', 'Alice', 'alice0710@gmail.com', '0912345678');
-        -- Success.
-        PERFORM test_register_user('someone123', '123123', 'Someone', 'someone@mail.com', '0911111111');
-        -- Fail. Duplicated username.
-        PERFORM test_register_user('someone123', '123456', 'Anotherone', 'anotherone@mail.com', '0922222222');
-        -- Fail. Duplicated email.
-        PERFORM test_register_user('anotherone123', '123456', 'Anotherone', 'someone@mail.com', '0922222222');
-        -- Fail. Duplicated phone.
-        PERFORM test_register_user('anotherone123', '123456', 'Anotherone', 'anotherone@mail.com', '0911111111');
-
-        RAISE INFO 'Done!';
     END;
 $$ LANGUAGE plpgsql;

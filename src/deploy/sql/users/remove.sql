@@ -1,4 +1,3 @@
-DROP FUNCTION test_register_user;
 DROP FUNCTION register_user;
 
 DROP FUNCTION username_to_id;

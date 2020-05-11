@@ -1,17 +1,25 @@
 -- Product type.
 CREATE TYPE PRODUCT AS (
+    id                  UUID_NN,
     name                TEXT_NN,
     price               INT_NN,
     customizes          HSTORE_NN,
-    latest_update       TIMESTAMPTZ
+    latest_update       TS_NN
 );
+
+-- Domain PRODUCT_NN.
+CREATE DOMAIN PRODUCT_NN AS PRODUCT
+    CONSTRAINT product_not_null CHECK (
+        VALUE IS NOT NULL
+    );
 
 
 
 -- Product errors.
 INSERT INTO errors (code, name, message) VALUES
     ('C4001', 'product_duplicated_customize', 'Customize already existed for the product.'),
-    ('C4002', 'product_customize_not_found', 'Customize not found for the product.');
+    ('C4002', 'product_customize_not_found', 'Customize for the product not found.'),
+    ('C4003', 'product_customize_mismatch', 'Customize for the product mismatch.');
 
 
 
@@ -21,7 +29,7 @@ CREATE OR REPLACE FUNCTION new_product (
     price INT_NN
 ) RETURNS PRODUCT AS $$
     BEGIN
-        RETURN (name, price, '', now())::PRODUCT;
+        RETURN (uuid_generate_v4(), name, price, '', now())::PRODUCT;
     END;
 $$ LANGUAGE plpgsql;
 
@@ -29,8 +37,8 @@ $$ LANGUAGE plpgsql;
 
 -- Create customize for the product.
 CREATE OR REPLACE FUNCTION product_create_customize (
-    INOUT product PRODUCT,
-    customize CUSTOMIZE
+    INOUT product PRODUCT_NN,
+    customize CUSTOMIZE_NN
 ) AS $$
     BEGIN
         IF (product.customizes ? upper(customize.name)) THEN
@@ -41,46 +49,48 @@ CREATE OR REPLACE FUNCTION product_create_customize (
     END;
 $$ LANGUAGE plpgsql;
 
-CREATE OR REPLACE FUNCTION test_product_create_customize (
-    INOUT product PRODUCT,
-    customize CUSTOMIZE
-) AS $$
-    BEGIN
-        product = product_create_customize(product, customize);
-        RAISE INFO 'Successfully created customize.';
-    EXCEPTION WHEN OTHERS THEN
-        RAISE INFO 'error_code:%, message:%', SQLSTATE, SQLERRM;
-    END;
-$$ LANGUAGE plpgsql;
-
 
 
 -- Read customize of the product.
 CREATE OR REPLACE FUNCTION product_read_customize (
-    product PRODUCT,
-    customize_name TEXT_NN
-) RETURNS CUSTOMIZE AS $$
+    product PRODUCT_NN,
+    customize_name TEXT_NN,
+    OUT customize CUSTOMIZE
+) AS $$
     BEGIN
-        RETURN (product.customizes -> upper(customize_name))::CUSTOMIZE;
+        customize = (product.customizes -> upper(customize_name))::CUSTOMIZE;
+        IF customize IS NULL THEN
+            PERFORM raise_error('product_customize_not_found');
+        END IF;
     END;
 $$ LANGUAGE plpgsql;
 
 
+
 -- Update customize of the product.
 CREATE OR REPLACE FUNCTION product_update_customize (
-    INOUT product PRODUCT,
-    customize CUSTOMIZE,
+    INOUT product PRODUCT_NN,
+    customize CUSTOMIZE_NN,
     new_name TEXT
 ) AS $$
+    DECLARE
+        old_customize CUSTOMIZE;
     BEGIN
-        IF new_name IS NOT NULL AND new_name != '' AND (product.customizes ? upper(new_name)) THEN
-            PERFORM raise_error('product_duplicated_customize');
+        old_customize = product_read_customize(product, customize.name);
+        
+        IF customize.id != old_customize.id THEN
+            PERFORM raise_error('product_customize_mismatch');
         END IF;
 
-        product.customizes = product.customizes - upper(customize.name);
-
         IF new_name IS NOT NULL AND new_name != '' THEN
-            customize.name = new_name;
+            IF product.customizes ? upper(new_name) THEN
+                PERFORM raise_error('product_duplicated_customize');
+            ELSE
+                product.customizes = product.customizes - upper(customize.name);
+                customize.name = new_name;
+            END IF;
+        ELSE
+            product.customizes = product.customizes - upper(customize.name);
         END IF;
 
         product.customizes = product.customizes || hstore(upper(customize.name), format('%s', customize));
@@ -88,75 +98,26 @@ CREATE OR REPLACE FUNCTION product_update_customize (
     END;
 $$ LANGUAGE plpgsql;
 
-CREATE OR REPLACE FUNCTION test_product_update_customize (
-    INOUT product PRODUCT,
-    customize CUSTOMIZE,
-    new_name TEXT
-) AS $$
-    BEGIN
-        product = product_update_customize(product, customize, new_name);
-        RAISE INFO 'Successfully updated customize.';
-    EXCEPTION WHEN OTHERS THEN
-        RAISE INFO 'error_code:%, message:%', SQLSTATE, SQLERRM;
-    END;
-$$ LANGUAGE plpgsql;
-
 
 
 -- Delete customize of a product.
 CREATE OR REPLACE FUNCTION product_delete_customize (
-    INOUT product PRODUCT,
-    name TEXT
+    INOUT product PRODUCT_NN,
+    name TEXT_NN,
+    id UUID_NN
 ) AS $$
-    BEGIN
-        product.customizes = product.customizes - upper(name);
-        product.latest_update = now();
-    END;
-$$ LANGUAGE plpgsql;
-
-
-
--- Test product functions and error handling.
-DO $$
     DECLARE
-        product PRODUCT;
+        customize CUSTOMIZE;
     BEGIN
-        RAISE INFO 'Testing product functions and error handling.';
+        customize = (product.customizes -> upper(name))::CUSTOMIZE;
 
-        product = new_product('product_1', 100);
-
-        -- Successfully insert.
-        product = test_product_create_customize(
-            product,
-            new_customize('customize_1')
-        );
-
-        -- Fail. Duplicated customize name.
-        product = test_product_create_customize(
-            product,
-            new_customize('customize_1')
-        );
-
-        -- Successfully updated.
-        product = test_product_update_customize (
-            product,
-            new_customize('customize_1'),
-            'customize_2'
-        );
-
-        -- Successfully deleted.
-        product = product_delete_customize(
-            product,
-            'customize_1'
-        );
-
-        -- Fail. Duplicated customize.
-        product = test_product_update_customize(
-            product,
-            new_customize('customize_1'),
-            'customize_2'
-        );
-
-        RAISE INFO 'Done!';
+        IF customize IS NULL THEN
+            PERFORM raise_error('product_customize_not_found');
+        ELSIF customize.id != id THEN
+            PERFORM raise_error('product_customize_mismatch');
+        ELSE
+            product.customizes = product.customizes - upper(name);
+            product.latest_update = now();
+        END IF;
     END;
 $$ LANGUAGE plpgsql;
