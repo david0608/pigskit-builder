@@ -3,8 +3,8 @@ DROP FUNCTION shop_delete_product;
 DROP FUNCTION shop_read_product;
 DROP FUNCTION shop_create_product;
 
-DROP FUNCTION set_shop_member_authority;
-DROP FUNCTION add_shop_member;
+DROP FUNCTION shop_set_authority;
+DROP FUNCTION shop_add_member;
 
 DROP FUNCTION check_shop_user_authority;
 

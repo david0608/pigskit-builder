@@ -91,17 +91,18 @@ $$ LANGUAGE plpgsql;
 CREATE OR REPLACE FUNCTION check_shop_user_authority (
     shop_id UUID_NN,
     user_id UUID_NN,
-    auth_name TEXT_NN,
-    auth_perm PERMISSION_NN,
+    auth AUTHORITY_NN,
+    perm PERMISSION_NN,
     OUT ok BOOLEAN
 ) AS $$
     DECLARE
-        auth PERMISSION;
+        _perm PERMISSION;
     BEGIN
-        EXECUTE 'SELECT t.' || auth_name || ' FROM shop_user AS t WHERE t.shop_id = $1 AND t.user_id = $2'
-            INTO auth
+        EXECUTE 'SELECT t.' || auth || ' FROM shop_user AS t WHERE t.shop_id = $1 AND t.user_id = $2'
+            INTO _perm
             USING shop_id, user_id;
-        IF auth = auth_perm::PERMISSION THEN
+        
+        IF _perm = perm::PERMISSION THEN
             ok := true;
         ELSE
             ok := false;
@@ -112,44 +113,51 @@ $$ LANGUAGE plpgsql;
 
 
 -- Add shop member by user session and specific shop_name and member username.
-CREATE OR REPLACE FUNCTION add_shop_member (
+CREATE OR REPLACE FUNCTION shop_add_member (
     user_id UUID_NN,
-    shop_id UUID_NN,
-    member_id UUID_NN
+    shop_name TEXT_NN,
+    member_name TEXT_NN
 ) RETURNS VOID AS $$
+    DECLARE
+        shop_id UUID;
+        member_id UUID;
     BEGIN
+        shop_id = shop_name_to_id(shop_name);
         IF NOT check_shop_user_authority(shop_id, user_id, 'team_authority', 'all') THEN
             PERFORM raise_error('permission_denied');
         END IF;
+        member_id = username_to_id(member_name);
         INSERT INTO shop_user (shop_id, user_id) VALUES (shop_id, member_id);
     END;
 $$ LANGUAGE plpgsql;
 
 
 
--- Set shop member authority.
-CREATE OR REPLACE FUNCTION set_shop_member_authority (
+-- Set shop user authority.
+CREATE OR REPLACE FUNCTION shop_set_authority (
     user_id UUID_NN,
-    shop_id UUID_NN,
-    member_id UUID_NN,
-    auth_name TEXT_NN,
-    auth_perm PERMISSION_NN
+    shop_name TEXT_NN,
+    member_name TEXT_NN,
+    auth AUTHORITY_NN,
+    perm PERMISSION_NN
 ) RETURNS VOID AS $$
     DECLARE
+        shop_id UUID;
+        member_id UUID;
         updated UUID;
     BEGIN
-        IF user_id = member_id AND auth_name = 'team_authority' THEN
-            PERFORM raise_error('invalid_operation');
-        END IF;
+        shop_id = shop_name_to_id(shop_name);
 
         IF NOT check_shop_user_authority(shop_id, user_id, 'team_authority', 'all') THEN
             PERFORM raise_error('permission_denied');
         END IF;
-        
-        EXECUTE 'UPDATE shop_user SET ' || auth_name || ' = $1 WHERE shop_id = $2 AND user_id = $3 RETURNING id'
+
+        member_id = username_to_id(member_name);
+
+        EXECUTE 'UPDATE shop_user SET ' || auth || ' = $1 WHERE shop_id = $2 AND user_id = $3 RETURNING id'
             INTO updated
-            USING auth_perm, shop_id, member_id;
-        
+            USING perm, shop_id, member_id;
+
         IF updated IS NULL THEN
             PERFORM raise_error('shop_user_update_authority_failed');
         END IF;

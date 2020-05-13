@@ -112,178 +112,18 @@ DROP FUNCTION test_create_shop;
 
 
 
--- Testing function shop_name_to_id and error handling.
-CREATE OR REPLACE FUNCTION test_add_shop_member (
-    user_id UUID,
-    shop_id UUID,
-    member_id UUID,
-    error TEXT
-) RETURNS VOID AS $$
-    BEGIN
-        PERFORM add_shop_member(user_id, shop_id, member_id);
-
-        IF error IS NOT NULL AND error != '' THEN
-            PERFORM raise_error('test_failed');
-        END IF;
-    EXCEPTION WHEN OTHERS THEN
-        DECLARE
-            c_name TEXT;
-        BEGIN
-            GET STACKED DIAGNOSTICS c_name = CONSTRAINT_NAME;
-            IF error IS NULL OR error = '' OR c_name != error THEN
-                RAISE EXCEPTION USING ERRCODE = SQLSTATE, MESSAGE = SQLERRM, CONSTRAINT = c_name;
-            END IF;
-        END;
-    END;
-$$ LANGUAGE plpgsql;
-
-DO $$
-    <<_>>
-    DECLARE
-        user_id UUID;
-        member_id UUID;
-        invalid_id UUID := uuid_generate_v4();
-        shop_id UUID;
-    BEGIN
-        RAISE INFO 'Testing function add_shop_member and error handling...';
-        
-        INSERT INTO users (username, password, name, email, phone)
-            VALUES ('david123', '123123', 'david', 'david123@mail.com', '0912312312')
-            RETURNING id INTO user_id;
-
-        INSERT INTO users (username, password, name, email, phone)
-            VALUES ('alice123', '123123', 'alice', 'alice123@mail.com', '0922312312')
-            RETURNING id INTO member_id;
-
-        PERFORM create_shop(user_id, 'davidshop');
-
-        shop_id = (SELECT id FROM shops WHERE name = 'davidshop');
-
-        PERFORM test_add_shop_member(user_id, shop_id, member_id, '');
-        PERFORM test_add_shop_member(user_id, shop_id, member_id, 'shop_user_shop_id_user_id_key');
-        PERFORM test_add_shop_member(member_id, shop_id, user_id, 'permission_denied');
-        PERFORM test_add_shop_member(member_id, invalid_id, user_id, 'permission_denied');
-        PERFORM test_add_shop_member(null, shop_id, member_id, 'uuid_not_null');
-        PERFORM test_add_shop_member(user_id, null, member_id, 'uuid_not_null');
-        PERFORM test_add_shop_member(user_id, shop_id, null, 'uuid_not_null');
-
-        DELETE FROM shop_user AS s WHERE s.user_id = _.user_id;
-        DELETE FROM shop_user AS s WHERE s.user_id = _.member_id;
-        DELETE FROM shops WHERE name = 'davidshop';
-
-        DELETE FROM users WHERE id = user_id;
-        DELETE FROM users WHERE id = member_id;
-
-        RAISE INFO 'Done!';
-    EXCEPTION WHEN OTHERS THEN
-        DECLARE
-            c_name TEXT;
-        BEGIN
-            GET STACKED DIAGNOSTICS c_name = CONSTRAINT_NAME;
-            RAISE INFO 'Error code:%, name:%, msg:%', SQLSTATE, c_name, SQLERRM;
-        END;
-    END;
-$$ LANGUAGE plpgsql;
-
-DROP FUNCTION test_add_shop_member;
-
-
-
--- Testing function set_shop_member_authority and error handling.
-CREATE OR REPLACE FUNCTION test_set_shop_member_authority (
-    user_id UUID,
-    shop_id UUID,
-    member_id UUID,
-    auth_name TEXT,
-    auth_permission PERMISSION,
-    error TEXT
-) RETURNS VOID AS $$
-    BEGIN
-        PERFORM set_shop_member_authority(user_id, shop_id, member_id, auth_name, auth_permission);
-
-        IF error IS NOT NULL AND error != '' THEN
-            PERFORM raise_error('test_failed');
-        END IF;
-    EXCEPTION WHEN OTHERS THEN
-        DECLARE
-            c_name TEXT;
-        BEGIN
-            GET STACKED DIAGNOSTICS c_name = CONSTRAINT_NAME;
-            IF error IS NULL OR error = '' OR c_name != error THEN
-                RAISE EXCEPTION USING ERRCODE = SQLSTATE, MESSAGE = SQLERRM, CONSTRAINT = c_name;
-            END IF;
-        END;
-    END;
-$$ LANGUAGE plpgsql;
-
-DO $$
-    <<_>>
-    DECLARE
-        user_id UUID;
-        member_id UUID;
-        shop_id UUID;
-        invalid_id UUID := uuid_generate_v4();
-    BEGIN
-        RAISE INFO 'Testing function set_shop_member_authority and error handling...';
-        
-        INSERT INTO users (username, password, name, email, phone)
-            VALUES ('david123', '123123', 'david', 'david123@mail.com', '0912312312')
-            RETURNING id INTO user_id;
-
-        INSERT INTO users (username, password, name, email, phone)
-            VALUES ('alice123', '123123', 'alice', 'alice123@mail.com', '0922312312')
-            RETURNING id INTO member_id;
-        
-        PERFORM create_shop(user_id, 'davidshop');
-        shop_id = (SELECT id FROM shops WHERE name = 'davidshop');
-        PERFORM add_shop_member(user_id, shop_id, member_id);
-
-        PERFORM test_set_shop_member_authority(user_id, shop_id, member_id, 'product_authority', 'all', '');
-        PERFORM test_set_shop_member_authority(member_id, shop_id, user_id, 'store_authority', 'none', 'permission_denied');
-        PERFORM test_set_shop_member_authority(user_id, shop_id, member_id, 'team_authority', 'all', '');
-        PERFORM test_set_shop_member_authority(member_id, shop_id, user_id, 'store_authority', 'none', '');
-        PERFORM test_set_shop_member_authority(user_id, shop_id, user_id, 'team_authority', 'read-only' ,'invalid_operation');
-        PERFORM test_set_shop_member_authority(user_id, shop_id, invalid_id, 'product_authority', 'read-only' ,'shop_user_update_authority_failed');
-        PERFORM test_set_shop_member_authority(null, shop_id, member_id, 'product_authority', 'read-only' ,'uuid_not_null');
-        PERFORM test_set_shop_member_authority(user_id, null, member_id, 'product_authority', 'read-only' ,'uuid_not_null');
-        PERFORM test_set_shop_member_authority(user_id, shop_id, null, 'product_authority', 'read-only' ,'uuid_not_null');
-        PERFORM test_set_shop_member_authority(user_id, shop_id, member_id, '', 'read-only', 'text_not_null');
-        PERFORM test_set_shop_member_authority(user_id, shop_id, member_id, null, 'read-only', 'text_not_null');
-        PERFORM test_set_shop_member_authority(user_id, shop_id, member_id, 'product_authority', null, 'permission_not_null');
-
-        DELETE FROM shop_user AS s WHERE s.user_id = _.user_id;
-        DELETE FROM shop_user AS s WHERE s.user_id = _.member_id;
-        DELETE FROM shops WHERE name = 'davidshop';
-
-        DELETE FROM users WHERE id = user_id;
-        DELETE FROM users WHERE id = member_id;
-
-        RAISE INFO 'Done!';
-    EXCEPTION WHEN OTHERS THEN
-        DECLARE
-            c_name TEXT;
-        BEGIN
-            GET STACKED DIAGNOSTICS c_name = CONSTRAINT_NAME;
-            RAISE INFO 'Error code:%, name:%, msg:%', SQLSTATE, c_name, SQLERRM;
-        END;
-    END;
-$$ LANGUAGE plpgsql;
-
-DROP FUNCTION test_set_shop_member_authority;
-
-
-
 -- Testing function check_shop_user_authority and error handling.
-CREATE OR REPLACE FUNCTION test_check_shop_user_authority (
+BEGIN;
+CREATE OR REPLACE FUNCTION test (
     shop_id UUID,
     user_id UUID,
-    auth_name TEXT,
-    auth_perm PERMISSION,
+    auth AUTHORITY,
+    perm PERMISSION,
     result BOOLEAN,
     error TEXT
 ) RETURNS VOID AS $$
     BEGIN
-        IF check_shop_user_authority(shop_id, user_id, auth_name, auth_perm) != result THEN
+        IF check_shop_user_authority(shop_id, user_id, auth, perm) != result THEN
             PERFORM raise_error('test_failed');
         END IF;
 
@@ -309,7 +149,7 @@ DO $$
         shop_id UUID;
         invalid_id UUID := uuid_generate_v4();
     BEGIN
-        RAISE INFO 'Testing function check_shop_products_all_authority and error handling...';
+        RAISE INFO 'Testing function check_shop_user_authority and error handling...';
 
         INSERT INTO users (username, password, name, email, phone)
             VALUES ('david123', '123123', 'david', 'david123@mail.com', '0912312312')
@@ -318,17 +158,15 @@ DO $$
         PERFORM create_shop(user_id, 'davidshop');
         shop_id = (SELECT id FROM shops WHERE name = 'davidshop');
 
-        PERFORM test_check_shop_user_authority(shop_id, user_id, 'team_authority', 'all', true, '');
-        PERFORM test_check_shop_user_authority(shop_id, user_id, 'team_authority', 'none', true, 'test_failed');
-        PERFORM test_check_shop_user_authority(shop_id, user_id, 'team_authority', 'none', false, '');
-        PERFORM test_check_shop_user_authority(invalid_id, user_id, 'product_authority', 'none', false, '');
-        PERFORM test_check_shop_user_authority(shop_id, invalid_id, 'store_authority', 'none', false, '');
-        PERFORM test_check_shop_user_authority(null, user_id, 'store_authority', 'none', false, 'uuid_not_null');
-        PERFORM test_check_shop_user_authority(shop_id, null, 'store_authority', 'none', false, 'uuid_not_null');
-
-        DELETE FROM shop_user AS s WHERE s.user_id = _.user_id;
-        DELETE FROM shops WHERE name = 'davidshop';
-        DELETE FROM users WHERE id = user_id;
+        PERFORM test(shop_id, user_id, 'team_authority', 'all', true, '');
+        PERFORM test(shop_id, user_id, 'team_authority', 'none', true, 'test_failed');
+        PERFORM test(shop_id, user_id, 'team_authority', 'none', false, '');
+        PERFORM test(invalid_id, user_id, 'product_authority', 'none', false, '');
+        PERFORM test(shop_id, invalid_id, 'store_authority', 'none', false, '');
+        PERFORM test(null, user_id, 'store_authority', 'none', false, 'uuid_not_null');
+        PERFORM test(shop_id, null, 'store_authority', 'none', false, 'uuid_not_null');
+        PERFORM test(shop_id, user_id, null, 'none', false, 'authority_not_null');
+        PERFORM test(shop_id, user_id, 'store_authority', null, false, 'permission_not_null');
 
         RAISE INFO 'Done!';
     EXCEPTION WHEN OTHERS THEN
@@ -340,8 +178,138 @@ DO $$
         END;
     END;
 $$ LANGUAGE plpgsql;
+ROLLBACK;
 
-DROP FUNCTION test_check_shop_user_authority;
+
+
+-- Testing function shop_add_member and error handling.
+BEGIN;
+CREATE OR REPLACE FUNCTION test (
+    user_id UUID,
+    shop_name TEXT,
+    member_name TEXT,
+    error TEXT
+) RETURNS VOID AS $$
+    BEGIN
+        PERFORM shop_add_member(user_id, shop_name, member_name);
+
+        IF error IS NOT NULL AND error != '' THEN
+            PERFORM raise_error('test_failed');
+        END IF;
+    EXCEPTION WHEN OTHERS THEN
+        DECLARE
+            c_name TEXT;
+        BEGIN
+            GET STACKED DIAGNOSTICS c_name = CONSTRAINT_NAME;
+            IF error IS NULL OR error = '' OR c_name != error THEN
+                RAISE EXCEPTION USING ERRCODE = SQLSTATE, MESSAGE = SQLERRM, CONSTRAINT = c_name;
+            END IF;
+        END;
+    END;
+$$ LANGUAGE plpgsql;
+
+DO $$
+    <<_>>
+    DECLARE
+        user_id UUID;
+        invalid_id UUID := uuid_generate_v4();
+    BEGIN
+
+        RAISE INFO 'Testing function shop_add_member and error handling...';
+        
+        INSERT INTO users (username, password, name, email, phone)
+            VALUES ('david123', '123123', 'david', 'david123@mail.com', '0912312312')
+            RETURNING id INTO user_id;
+
+        INSERT INTO users (username, password, name, email, phone)
+            VALUES ('alice123', '123123', 'alice', 'alice123@mail.com', '0922312312');
+
+        PERFORM create_shop(user_id, 'davidshop');
+
+        PERFORM test(user_id, 'davidshop', 'alice123', '');
+        PERFORM test(user_id, 'davidshop', 'alice123', 'shop_user_shop_id_user_id_key');
+        PERFORM test(invalid_id, 'davidshop', 'alice123', 'permission_denied');
+        PERFORM test(invalid_id, 'invalid', 'alice123', 'shop_not_found');
+
+        RAISE INFO 'Done!';
+    EXCEPTION WHEN OTHERS THEN
+        DECLARE
+            c_name TEXT;
+        BEGIN
+            GET STACKED DIAGNOSTICS c_name = CONSTRAINT_NAME;
+            RAISE INFO 'Error code:%, name:%, msg:%', SQLSTATE, c_name, SQLERRM;
+        END;
+    END;
+$$ LANGUAGE plpgsql;
+ROLLBACK;
+
+
+
+-- Testing function shop_set_authority and error handling.
+BEGIN;
+CREATE OR REPLACE FUNCTION test (
+    user_id UUID,
+    shop_name TEXT,
+    member_name TEXT,
+    auth AUTHORITY,
+    perm PERMISSION,
+    error TEXT
+) RETURNS VOID AS $$
+    BEGIN
+        PERFORM shop_set_authority(user_id, shop_name, member_name, auth, perm);
+
+        IF error IS NOT NULL AND error != '' THEN
+            PERFORM raise_error('test_failed');
+        END IF;
+    EXCEPTION WHEN OTHERS THEN
+        DECLARE
+            c_name TEXT;
+        BEGIN
+            GET STACKED DIAGNOSTICS c_name = CONSTRAINT_NAME;
+            IF error IS NULL OR error = '' OR c_name != error THEN
+                RAISE EXCEPTION USING ERRCODE = SQLSTATE, MESSAGE = SQLERRM, CONSTRAINT = c_name;
+            END IF;
+        END;
+    END;
+$$ LANGUAGE plpgsql;
+
+DO $$
+    <<_>>
+    DECLARE
+        user_id UUID;
+        member_id UUID;
+        invalid_id UUID := uuid_generate_v4();
+    BEGIN
+        RAISE INFO 'Testing function shop_set_authority and error handling...';
+        
+        INSERT INTO users (username, password, name, email, phone)
+            VALUES ('david123', '123123', 'david', 'david123@mail.com', '0912312312')
+            RETURNING id INTO user_id;
+
+        INSERT INTO users (username, password, name, email, phone)
+            VALUES ('alice123', '123123', 'alice', 'alice123@mail.com', '0922312312')
+            RETURNING id INTO member_id;
+        
+        PERFORM create_shop(user_id, 'davidshop');
+        PERFORM shop_add_member(user_id, 'davidshop', 'alice123');
+
+        PERFORM test(user_id, 'davidshop', 'alice123', 'product_authority', 'all', '');
+        PERFORM test(invalid_id, 'davidshop', 'alice123', 'product_authority', 'none', 'permission_denied');
+        PERFORM test(user_id, 'davidshop', 'alice123', 'team_authority', 'all', '');
+        PERFORM test(member_id, 'davidshop', 'david123', 'store_authority', 'none', '');
+        PERFORM test(user_id, 'davidshop', 'invalid', 'product_authority', 'read-only' ,'user_not_found');
+
+        RAISE INFO 'Done!';
+    EXCEPTION WHEN OTHERS THEN
+        DECLARE
+            c_name TEXT;
+        BEGIN
+            GET STACKED DIAGNOSTICS c_name = CONSTRAINT_NAME;
+            RAISE INFO 'Error code:%, name:%, msg:%', SQLSTATE, c_name, SQLERRM;
+        END;
+    END;
+$$ LANGUAGE plpgsql;
+ROLLBACK;
 
 
 
