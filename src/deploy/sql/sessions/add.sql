@@ -16,8 +16,8 @@ INSERT INTO errors (code, name, message) VALUES
 
 -- Signin user.
 CREATE OR REPLACE FUNCTION signin_user (
-    username TEXT_NN,
-    password TEXT_NN,
+    username TEXT_NZ,
+    password TEXT_NZ,
     OUT session_id UUID
 ) AS $$
     DECLARE

@@ -1,8 +1,8 @@
 -- Errors table.
 CREATE TABLE errors (
     code            TEXT PRIMARY KEY CHECK (LENGTH(code) = 5 AND code LIKE 'C%'),
-    name            TEXT_NN UNIQUE,
-    message         TEXT_NN
+    name            TEXT_NZ UNIQUE,
+    message         TEXT_NZ
 );
 
 -- Trigger function which automatically convert code column of errors table to uppercase.

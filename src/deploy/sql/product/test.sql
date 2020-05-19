@@ -1,292 +1,139 @@
--- Testing function new_product and error handling.
-CREATE OR REPLACE FUNCTION test_new_product (
-    name TEXT,
-    price INTEGER,
-    error TEXT
-) RETURNS VOID AS $$
-    BEGIN
-        PERFORM new_product(name, price);
-
-        IF error IS NOT NULL AND error != '' THEN
-            PERFORM raise_error('test_failed');
-        END IF;
-    EXCEPTION WHEN OTHERS THEN
-        DECLARE
-            c_name TEXT;
-        BEGIN
-            GET STACKED DIAGNOSTICS c_name = CONSTRAINT_NAME;
-            IF error IS NULL OR error = '' OR c_name != error THEN
-                RAISE EXCEPTION USING ERRCODE = SQLSTATE, MESSAGE = SQLERRM, CONSTRAINT = c_name;
-            END IF;
-        END;
-    END;
-$$ LANGUAGE plpgsql;
-
-DO $$
-    BEGIN
-        RAISE INFO 'Testing function new_product and error handling...';
-
-        PERFORM test_new_product('prod1', 100, '');
-        PERFORM test_new_product('', 100, 'text_not_null');
-        PERFORM test_new_product(null, 100, 'text_not_null');
-        PERFORM test_new_product('prod1', null, 'integer_not_null');
-
-        RAISE INFO 'Done!';
-    EXCEPTION WHEN OTHERS THEN
-        DECLARE
-            c_name TEXT;
-        BEGIN
-            GET STACKED DIAGNOSTICS c_name = CONSTRAINT_NAME;
-            RAISE INFO 'Error code:%, name:%, msg:%', SQLSTATE, c_name, SQLERRM;
-        END;
-    END;
-$$ LANGUAGE plpgsql;
-
-DROP FUNCTION test_new_product;
-
-
-
--- Testing function product_create_customize and error handling.
-CREATE OR REPLACE FUNCTION test_product_create_customize (
-    INOUT product PRODUCT,
-    customize CUSTOMIZE,
-    error TEXT
-) AS $$
-    BEGIN
-        product = product_create_customize(product, customize);
-
-        IF error IS NOT NULL AND error != '' THEN
-            PERFORM raise_error('test_failed');
-        END IF;
-    EXCEPTION WHEN OTHERS THEN
-        DECLARE
-            c_name TEXT;
-        BEGIN
-            GET STACKED DIAGNOSTICS c_name = CONSTRAINT_NAME;
-            IF error IS NULL OR error = '' OR c_name != error THEN
-                RAISE EXCEPTION USING ERRCODE = SQLSTATE, MESSAGE = SQLERRM, CONSTRAINT = c_name;
-            END IF;
-        END;
-    END;
-$$ LANGUAGE plpgsql;
-
-DO $$
-    DECLARE
-        product PRODUCT;
-    BEGIN
-        RAISE INFO 'Testing function product_create_customize and error handling...';
-
-        product = new_product('prod1', 100);
-
-        product = test_product_create_customize(product, new_customize('c1'), '');
-        PERFORM test_product_create_customize(product, new_customize('c1'), 'product_duplicated_customize');
-        PERFORM test_product_create_customize(null, new_customize('c2'), 'product_not_null');
-        PERFORM test_product_create_customize(product, null, 'customize_not_null');
-        product = test_product_create_customize(product, new_customize('c2'), '');
-
-        RAISE INFO 'Done!';
-    EXCEPTION WHEN OTHERS THEN
-        DECLARE
-            c_name TEXT;
-        BEGIN
-            GET STACKED DIAGNOSTICS c_name = CONSTRAINT_NAME;
-            RAISE INFO 'Error code:%, name:%, msg:%', SQLSTATE, c_name, SQLERRM;
-        END;
-    END;
-$$ LANGUAGE plpgsql;
-
-DROP FUNCTION test_product_create_customize;
-
-
-
--- Testing function product_read_customize and error handling.
-CREATE OR REPLACE FUNCTION test_product_read_customize (
-    product PRODUCT,
-    name TEXT,
-    customize CUSTOMIZE_NN,
-    error TEXT
-) RETURNS VOID AS $$
-    <<_>>
-    DECLARE
-        customize CUSTOMIZE;
-    BEGIN
-        _.customize = product_read_customize(product, name);
-
-        IF _.customize != test_product_read_customize.customize THEN
-            PERFORM raise_error('test_failed');
-        END IF;
-
-        IF error IS NOT NULL AND error != '' THEN
-            PERFORM raise_error('test_failed');
-        END IF;
-    EXCEPTION WHEN OTHERS THEN
-        DECLARE
-            c_name TEXT;
-        BEGIN
-            GET STACKED DIAGNOSTICS c_name = CONSTRAINT_NAME;
-            IF error IS NULL OR error = '' OR c_name != error THEN
-                RAISE EXCEPTION USING ERRCODE = SQLSTATE, MESSAGE = SQLERRM, CONSTRAINT = c_name;
-            END IF;
-        END;
-    END;
-$$ LANGUAGE plpgsql;
-
+-- Test functinos for product.
+BEGIN;
 DO $$
     DECLARE
         prod PRODUCT;
-        cus CUSTOMIZE;
-    BEGIN
-        RAISE INFO 'Testing function product_read_customize and error handling...';
-
-        prod = new_product('p1', 100);
-        cus = new_customize('c1');
-        prod = product_create_customize(prod, cus);
-
-        PERFORM test_product_read_customize(prod, 'c1', cus, '');
-        PERFORM test_product_read_customize(prod, 'c1', new_customize('c1'), 'test_failed');
-        PERFORM test_product_read_customize(prod, 'c2', cus, 'product_customize_not_found');
-        PERFORM test_product_read_customize(null, 'c1', cus, 'product_not_null');
-        PERFORM test_product_read_customize(prod, '', cus, 'text_not_null');
-        PERFORM test_product_read_customize(prod, null, cus, 'text_not_null');
-
-        RAISE INFO 'Done!';
-    EXCEPTION WHEN OTHERS THEN
-        DECLARE
-            c_name TEXT;
-        BEGIN
-            GET STACKED DIAGNOSTICS c_name = CONSTRAINT_NAME;
-            RAISE INFO 'Error code:%, name:%, msg:%', SQLSTATE, c_name, SQLERRM;
-        END;
-    END;
-$$ LANGUAGE plpgsql;
-
-DROP FUNCTION test_product_read_customize;
-
-
-
--- Testing function product_update_customize and error handling.
-CREATE OR REPLACE FUNCTION test_product_update_customize (
-    INOUT product PRODUCT,
-    customize CUSTOMIZE,
-    new_name TEXT,
-    error TEXT
-) AS $$
-    BEGIN
-        product = product_update_customize(product, customize, new_name);
-
-        IF error IS NOT NULL AND error != '' THEN
-            PERFORM raise_error('test_failed');
-        END IF;
-    EXCEPTION WHEN OTHERS THEN
-        DECLARE
-            c_name TEXT;
-        BEGIN
-            GET STACKED DIAGNOSTICS c_name = CONSTRAINT_NAME;
-            IF error IS NULL OR error = '' OR c_name != error THEN
-                RAISE EXCEPTION USING ERRCODE = SQLSTATE, MESSAGE = SQLERRM, CONSTRAINT = c_name;
-            END IF;
-        END;
-    END;
-$$ LANGUAGE plpgsql;
-
-DO $$
-    DECLARE
-        prod PRODUCT;
-        cus CUSTOMIZE;
-        opt OPTION;
-    BEGIN
-        RAISE INFO 'Testing function product_update_customize and error handling...';
-
-        prod = new_product('p1', 100);
-        cus = new_customize('c1');
-        opt = new_option('o1', 100);
-        cus = customize_create_option(cus, opt);
-        prod = product_create_customize(prod, cus);
-
-        opt.price = 200;
-        cus = customize_update_option(cus, opt, '');
-        prod = test_product_update_customize(prod, cus, '', '');
-        prod = test_product_update_customize(prod, cus, 'c2', '');
-        PERFORM test_product_update_customize(prod, cus, 'c3', 'product_customize_not_found');
-        PERFORM test_product_update_customize(prod, new_customize('c2'), 'c3', 'product_customize_mismatch');
-        prod = product_create_customize(prod, new_customize('c3'));
-        cus.name = 'c2';
-        PERFORM test_product_update_customize(prod, cus, 'c3', 'product_duplicated_customize');
-        PERFORM test_product_update_customize(null, cus, 'c4', 'product_not_null');
-        PERFORM test_product_update_customize(prod, null, 'c4', 'customize_not_null');
-        prod = test_product_update_customize(prod, cus, 'c4', '');
-
-        RAISE INFO 'Done!';
-    EXCEPTION WHEN OTHERS THEN
-        DECLARE
-            c_name TEXT;
-        BEGIN
-            GET STACKED DIAGNOSTICS c_name = CONSTRAINT_NAME;
-            RAISE INFO 'Error code:%, name:%, msg:%', SQLSTATE, c_name, SQLERRM;
-        END;
-    END;
-$$ LANGUAGE plpgsql;
-
-DROP FUNCTION test_product_update_customize;
-
-
-
--- Testing function product_delete_customize and error handling.
-CREATE OR REPLACE FUNCTION test_product_delete_customize (
-    INOUT product PRODUCT,
-    name TEXT,
-    id UUID,
-    error TEXT
-) AS $$
-    BEGIN
-        product = product_delete_customize(product, name, id);
-
-        IF error IS NOT NULL AND error != '' THEN
-            PERFORM raise_error('test_failed');
-        END IF;
-    EXCEPTION WHEN OTHERS THEN
-        DECLARE
-            c_name TEXT;
-        BEGIN
-            GET STACKED DIAGNOSTICS c_name = CONSTRAINT_NAME;
-            IF error IS NULL OR error = '' OR c_name != error THEN
-                RAISE EXCEPTION USING ERRCODE = SQLSTATE, MESSAGE = SQLERRM, CONSTRAINT = c_name;
-            END IF;
-        END;
-    END;
-$$ LANGUAGE plpgsql;
-
-DO $$
-    DECLARE
-        prod PRODUCT;
-        cus1 CUSTOMIZE;
+        cus_key1 UUID;
+        cus_key2 UUID;
         cus2 CUSTOMIZE;
+        opt_key1 UUID;
+        opt_key2 UUID;
+        payload JSONB;
     BEGIN
-        RAISE INFO 'Testing function product_delete_customize and error handling...';
-        
-        prod = new_product('p1', 100);
-        cus1 = new_customize('c1');
-        cus2 = new_customize('c2');
-        prod = product_create_customize(prod, cus1);
-        prod = product_create_customize(prod, cus2);
+        prod = product_create(
+            'prod',
+            'new product',
+            1000,
+            null,
+            '[
+                {
+                    "name": "cus1",
+                    "description": "customize 1.",
+                    "options": [
+                        {
+                            "name": "opt1",
+                            "price": 100
+                        },
+                        {
+                            "name": "opt2",
+                            "price": 200
+                        }
+                    ]
+                },
+                {
+                    "name": "cus2",
+                    "description": "customize 2.",
+                    "options": [
+                        {
+                            "name": "opt3",
+                            "price": 300
+                        },
+                        {
+                            "name": "opt4",
+                            "price": 400
+                        }
+                    ]
+                }
+            ]'
+        );
+        select key into cus_key1 from query_product_customizes(prod) where (customize).name = 'cus1';
+        select key into cus_key2 from query_product_customizes(prod) where (customize).name = 'cus2';
 
-        PERFORM test_product_delete_customize(prod, cus1.name, cus2.id, 'product_customize_mismatch');
-        prod = test_product_delete_customize(prod, cus1.name, cus1.id, '');
-        PERFORM test_product_delete_customize(prod, cus1.name, cus1.id, 'product_customize_not_found');
-        PERFORM test_product_delete_customize(null, cus2.name, cus2.id, 'product_not_null');
-        PERFORM test_product_delete_customize(prod, null, cus2.id, 'text_not_null');
-        PERFORM test_product_delete_customize(prod, cus2.name, null, 'uuid_not_null');
-        prod = test_product_delete_customize(prod, cus2.name, cus2.id, '');
+        cus2 = product_read_customize(prod, cus_key2);
+        select key into opt_key1 from query_customize_options(cus2) where (option).name = 'opt3';
+        select key into opt_key2 from query_customize_options(cus2) where (option).name = 'opt4';
 
-        RAISE INFO 'Done!';
-    EXCEPTION WHEN OTHERS THEN
-        DECLARE
-            c_name TEXT;
-        BEGIN
-            GET STACKED DIAGNOSTICS c_name = CONSTRAINT_NAME;
-            RAISE INFO 'Error code:%, name:%, msg:%', SQLSTATE, c_name, SQLERRM;
-        END;
+        raise info '%', prod;
+
+        payload = jsonb_build_object(
+            'name', 'test',
+            'description', 'test product.',
+            'price', 2000,
+            'series_id', uuid_generate_v4(),
+            'delete', jsonb_build_array(cus_key1),
+            'create', jsonb_build_array('{
+                "name": "cus3",
+                "description": "csutomize 3.",
+                "options": [
+                    {
+                        "name": "opt5",
+                        "price": 500
+                    }
+                ]
+            }'::JSONB),
+            'update', jsonb_build_object(
+                cus_key2, jsonb_build_object(
+                    'name', 'cus_test',
+                    'description', 'customize test',
+                    'delete', jsonb_build_array(opt_key1),
+                    'create', jsonb_build_array('{ "name": "opt5", "price": 500 }'::JSONB),
+                    'update', jsonb_build_object(
+                        opt_key2, '{ "price": 700 }'::JSONB
+                    )
+                )
+            )
+        );
+
+        prod = product_update(prod, payload);
+
+        raise info '%', prod;
     END;
 $$ LANGUAGE plpgsql;
+ROLLBACK;
 
-DROP FUNCTION test_product_delete_customize;
+
+
+-- BEGIN;
+-- with create_product as (
+--     select product_create(
+--         'prod',
+--         'test product.',
+--         1000,
+--         null,
+--         '[
+--             {
+--                 "name": "cus1",
+--                 "description": "csutomize 1.",
+--                 "options": [
+--                     {
+--                         "name": "opt1",
+--                         "price": 100
+--                     },
+--                     {
+--                         "name": "opt2",
+--                         "price": 200
+--                     }
+--                 ]
+--             },
+--             {
+--                 "name": "cus2",
+--                 "description": "csutomize 2.",
+--                 "options": [
+--                     {
+--                         "name": "opt3",
+--                         "price": 100
+--                     },
+--                     {
+--                         "name": "opt4",
+--                         "price": 200
+--                     }
+--                 ]
+--             }
+--         ]'
+--     ) AS prod
+-- )
+-- , query_customize as (
+--     select query_product_customizes(prod) AS cus from create_product
+-- )
+-- select (cus).key, (cus).customize.* from query_customize;
+-- ROLLBACK;

@@ -12,6 +12,7 @@ database_objs=(
     customize
     product
     shops
+    shop_user
     stores
 )
 

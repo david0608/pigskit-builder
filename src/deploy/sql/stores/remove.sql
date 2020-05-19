@@ -6,7 +6,7 @@ DROP FUNCTION check_store_user_authority;
 
 DROP FUNCTION create_store;
 
-DELETE FROM errors WHERE code LIKE 'C6%';
+DELETE FROM errors WHERE code LIKE 'C7%';
 
 DROP TABLE store_user;
 

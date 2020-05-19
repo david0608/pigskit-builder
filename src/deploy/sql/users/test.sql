@@ -113,3 +113,10 @@ DO $$
 $$ LANGUAGE plpgsql;
 
 DROP FUNCTION test_register_user;
+
+DO $$
+    BEGIN
+        PERFORM register_user('david0608', '123123', 'david', 'david0608@mail.com', '0912312312');
+        PERFORM register_user('alice0710', '123123', 'alice', 'alice0710@mail.com', '0932132132');
+    END;
+$$ LANGUAGE plpgsql;

@@ -1,11 +1,11 @@
 -- Users table.
 CREATE TABLE users (
     id              UUID_NN PRIMARY KEY DEFAULT uuid_generate_v4(),
-    username        TEXT_NN UNIQUE,
-    password        TEXT_NN,
-    name            TEXT_NN,
-    email           TEXT_NN UNIQUE,
-    phone           TEXT_NN UNIQUE
+    username        TEXT_NZ UNIQUE,
+    password        TEXT_NZ,
+    name            TEXT_NZ,
+    email           TEXT_NZ UNIQUE,
+    phone           TEXT_NZ UNIQUE
 );
 
 
@@ -21,7 +21,7 @@ INSERT INTO errors (code, name, message) VALUES
 
 -- Get user_id from specific username.
 CREATE OR REPLACE FUNCTION username_to_id (
-    username TEXT_NN,
+    username TEXT_NZ,
     OUT id UUID
 ) AS $$
     BEGIN
@@ -35,11 +35,11 @@ $$ LANGUAGE plpgsql;
 
 -- Register and user.
 CREATE OR REPLACE FUNCTION register_user (
-    username TEXT_NN,
-    password TEXT_NN,
-    name TEXT_NN,
-    email TEXT_NN,
-    phone TEXT_NN
+    username TEXT_NZ,
+    password TEXT_NZ,
+    name TEXT_NZ,
+    email TEXT_NZ,
+    phone TEXT_NZ
 ) RETURNS VOID AS $$
     BEGIN
         INSERT INTO users(username, password, name, email, phone)

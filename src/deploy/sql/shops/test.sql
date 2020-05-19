@@ -1,593 +1,163 @@
--- Testing function shop_name_to_id and error handling.
-CREATE OR REPLACE FUNCTION test_shop_name_to_id (
-    shop_name TEXT,
-    OUT shop_id UUID,
-    error TEXT
-) AS $$
-    BEGIN
-        shop_id = shop_name_to_id(shop_name);
-
-        IF error IS NOT NULL AND error != '' THEN
-            PERFORM raise_error('test_failed');
-        END IF;
-    EXCEPTION WHEN OTHERS THEN
-        DECLARE
-            c_name TEXT;
-        BEGIN
-            GET STACKED DIAGNOSTICS c_name = CONSTRAINT_NAME;
-            IF error IS NULL OR error = '' OR c_name != error THEN
-                RAISE EXCEPTION USING ERRCODE = SQLSTATE, MESSAGE = SQLERRM, CONSTRAINT = c_name;
-            END IF;
-        END;
-    END;
-$$ LANGUAGE plpgsql;
-
-DO $$
-    BEGIN
-        RAISE INFO 'Testing function shop_name_to_id and error handling...';
-
-        INSERT INTO shops (name) VALUES ('s1');
-
-        PERFORM test_shop_name_to_id('s1', '');
-        PERFORM test_shop_name_to_id('s2', 'shop_not_found');
-        PERFORM test_shop_name_to_id('', 'text_not_null');
-        PERFORM test_shop_name_to_id(null, 'text_not_null');
-
-        DELETE FROM shops WHERE name = 's1';
-
-        RAISE INFO 'Done!';
-    EXCEPTION WHEN OTHERS THEN
-        DECLARE
-            c_name TEXT;
-        BEGIN
-            GET STACKED DIAGNOSTICS c_name = CONSTRAINT_NAME;
-            RAISE INFO 'Error code:%, name:%, msg:%', SQLSTATE, c_name, SQLERRM;
-        END;
-    END;
-$$ LANGUAGE plpgsql;
-
-DROP FUNCTION test_shop_name_to_id;
-
-
-
--- Testing function create_shop and error handling.
-CREATE OR REPLACE FUNCTION test_create_shop (
-    user_id UUID,
-    shop_name TEXT,
-    error TEXT
-) RETURNS VOID AS $$
-    BEGIN
-        PERFORM create_shop(user_id, shop_name);
-
-        IF error IS NOT NULL AND error != '' THEN
-            PERFORM raise_error('test_failed');
-        END IF;
-    EXCEPTION WHEN OTHERS THEN
-        DECLARE
-            c_name TEXT;
-        BEGIN
-            GET STACKED DIAGNOSTICS c_name = CONSTRAINT_NAME;
-            IF error IS NULL OR error = '' OR c_name != error THEN
-                RAISE EXCEPTION USING ERRCODE = SQLSTATE, MESSAGE = SQLERRM, CONSTRAINT = c_name;
-            END IF;
-        END;
-    END;
-$$ LANGUAGE plpgsql;
-
-DO $$
-    <<_>>
-    DECLARE
-        user_id UUID;
-        invalid_user UUID := uuid_generate_v4();
-    BEGIN
-        RAISE INFO 'Testing function create_shop and error handling...';
-
-        INSERT INTO users (username, password, name, email, phone)
-            VALUES ('david123', '123123', 'david', 'david123@mail.com', '0912312312')
-            RETURNING id INTO user_id;
-
-        PERFORM test_create_shop(user_id, 's1', '');
-        PERFORM test_create_shop(user_id, 's1', 'shops_name_upper_key');
-        PERFORM test_create_shop(invalid_user, 's2', 'shop_user_user_id_fkey');
-        PERFORM test_create_shop(null, 's2', 'uuid_not_null');
-        PERFORM test_create_shop(user_id, '', 'text_not_null');
-        PERFORM test_create_shop(user_id, null, 'text_not_null');
-        
-        DELETE FROM shop_user AS s WHERE s.user_id = _.user_id;
-        DELETE FROM shops WHERE name = 's1';
-        DELETE FROM users WHERE id = user_id;
-
-        RAISE INFO 'Done!';
-    EXCEPTION WHEN OTHERS THEN
-        DECLARE
-            c_name TEXT;
-        BEGIN
-            GET STACKED DIAGNOSTICS c_name = CONSTRAINT_NAME;
-            RAISE INFO 'Error code:%, name:%, msg:%', SQLSTATE, c_name, SQLERRM;
-        END;
-    END;
-$$ LANGUAGE plpgsql;
-
-DROP FUNCTION test_create_shop;
-
-
-
--- Testing function check_shop_user_authority and error handling.
 BEGIN;
-CREATE OR REPLACE FUNCTION test (
-    shop_id UUID,
-    user_id UUID,
-    auth AUTHORITY,
-    perm PERMISSION,
-    result BOOLEAN,
-    error TEXT
-) RETURNS VOID AS $$
-    BEGIN
-        IF check_shop_user_authority(shop_id, user_id, auth, perm) != result THEN
-            PERFORM raise_error('test_failed');
-        END IF;
-
-        IF error IS NOT NULL AND error != '' THEN
-            PERFORM raise_error('test_failed');
-        END IF;
-    EXCEPTION WHEN OTHERS THEN
-        DECLARE
-            c_name TEXT;
-        BEGIN
-            GET STACKED DIAGNOSTICS c_name = CONSTRAINT_NAME;
-            IF error IS NULL OR error = '' OR c_name != error THEN
-                RAISE EXCEPTION USING ERRCODE = SQLSTATE, MESSAGE = SQLERRM, CONSTRAINT = c_name;
-            END IF;
-        END;
-    END;
-$$ LANGUAGE plpgsql;
-
 DO $$
-    <<_>>
     DECLARE
-        user_id UUID;
         shop_id UUID;
-        invalid_id UUID := uuid_generate_v4();
+        prod_key UUID;
+        prod PRODUCT;
+        cus_key UUID;
+        cus CUSTOMIZE;
+        opt_key UUID;
+        opt OPTION;
+        payload TEXT_NN;
     BEGIN
-        RAISE INFO 'Testing function check_shop_user_authority and error handling...';
+        INSERT INTO shops(name) VALUES ('testshop') RETURNING id INTO shop_id;
 
-        INSERT INTO users (username, password, name, email, phone)
-            VALUES ('david123', '123123', 'david', 'david123@mail.com', '0912312312')
-            RETURNING id INTO user_id;
+        payload = jsonb_build_object(
+            'name', 'prod1',
+            'description', 'product 1.',
+            'price', 1000,
+            'series_id', uuid_generate_v4(),
+            'customizes', jsonb_build_array(
+                jsonb_build_object(
+                    'name', 'cus1',
+                    'description', 'customize 1.',
+                    'options', jsonb_build_array(
+                        jsonb_build_object(
+                            'name', 'opt1',
+                            'price', 100
+                        )
+                    )
+                )
+            )
+        );
+        perform shop_create_product(shop_id, payload);
 
-        PERFORM create_shop(user_id, 'davidshop');
-        shop_id = (SELECT id FROM shops WHERE name = 'davidshop');
+        select key into prod_key from query_shop_products(shop_id) where (product).name = 'prod1';
+        prod = shop_read_product(shop_id, prod_key);
+        raise info '%', prod;
 
-        PERFORM test(shop_id, user_id, 'team_authority', 'all', true, '');
-        PERFORM test(shop_id, user_id, 'team_authority', 'none', true, 'test_failed');
-        PERFORM test(shop_id, user_id, 'team_authority', 'none', false, '');
-        PERFORM test(invalid_id, user_id, 'product_authority', 'none', false, '');
-        PERFORM test(shop_id, invalid_id, 'store_authority', 'none', false, '');
-        PERFORM test(null, user_id, 'store_authority', 'none', false, 'uuid_not_null');
-        PERFORM test(shop_id, null, 'store_authority', 'none', false, 'uuid_not_null');
-        PERFORM test(shop_id, user_id, null, 'none', false, 'authority_not_null');
-        PERFORM test(shop_id, user_id, 'store_authority', null, false, 'permission_not_null');
+        select key into cus_key from query_product_customizes(prod) where (customize).name = 'cus1';
+        cus = product_read_customize(prod, cus_key);
+        raise info '%', cus;
 
-        RAISE INFO 'Done!';
-    EXCEPTION WHEN OTHERS THEN
-        DECLARE
-            c_name TEXT;
-        BEGIN
-            GET STACKED DIAGNOSTICS c_name = CONSTRAINT_NAME;
-            RAISE INFO 'Error code:%, name:%, msg:%', SQLSTATE, c_name, SQLERRM;
-        END;
+        select key into opt_key from query_customize_options(cus) where (option).name = 'opt1';
+        opt = customize_read_option(cus, opt_key);
+        raise info '%', opt;
+
+        payload = jsonb_build_object(
+            'name', 'prod_u',
+            'description', 'product updated.',
+            'price', 2000,
+            'series_id', uuid_generate_v4(),
+            'update', jsonb_build_object(
+                cus_key, jsonb_build_object(
+                    'name', 'cus_u',
+                    'description', 'customize updated.',
+                    'create', jsonb_build_array(
+                        jsonb_build_object(
+                            'name', 'opt_c',
+                            'price', 200
+                        )
+                    ),
+                    'update', jsonb_build_object(
+                        opt_key, jsonb_build_object(
+                            'name', 'opt_u',
+                            'price', 1000
+                        )
+                    )
+                )
+            )
+        );
+        perform shop_update_product(shop_id, prod_key, payload);
+
+        prod = shop_read_product(shop_id, prod_key);
+        raise info '%', prod;
+
+        payload = jsonb_build_object(
+            'delete', jsonb_build_array(cus_key),
+            'create', jsonb_build_array(
+                jsonb_build_object(
+                    'name', 'cus3',
+                    'description', 'customize 3.'
+                )
+            )
+        );
+        perform shop_update_product(shop_id, prod_key, payload);
+
+        prod = shop_read_product(shop_id, prod_key);
+        raise info '%', prod;
+
+        select key into cus_key from query_product_customizes(prod) where (customize).name = 'cus3';
+        cus = product_read_customize(prod, cus_key);
+        raise info '%', cus;
+
+        payload = jsonb_build_object(
+            'delete', jsonb_build_array(cus_key)
+        );
+        perform shop_update_product(shop_id, prod_key, payload);
+
+        prod = shop_read_product(shop_id, prod_key);
+        raise info '%', prod;
     END;
 $$ LANGUAGE plpgsql;
 ROLLBACK;
 
 
 
--- Testing function shop_add_member and error handling.
 BEGIN;
-CREATE OR REPLACE FUNCTION test (
-    user_id UUID,
-    shop_name TEXT,
-    member_name TEXT,
-    error TEXT
-) RETURNS VOID AS $$
+DO $$
+    DECLARE
+        shop_id UUID;
     BEGIN
-        PERFORM shop_add_member(user_id, shop_name, member_name);
-
-        IF error IS NOT NULL AND error != '' THEN
-            PERFORM raise_error('test_failed');
-        END IF;
-    EXCEPTION WHEN OTHERS THEN
-        DECLARE
-            c_name TEXT;
-        BEGIN
-            GET STACKED DIAGNOSTICS c_name = CONSTRAINT_NAME;
-            IF error IS NULL OR error = '' OR c_name != error THEN
-                RAISE EXCEPTION USING ERRCODE = SQLSTATE, MESSAGE = SQLERRM, CONSTRAINT = c_name;
-            END IF;
-        END;
+        INSERT INTO shops(name) VALUES ('testshop') RETURNING id INTO shop_id;
+        PERFORM shop_create_series(shop_id, 'series1');
     END;
 $$ LANGUAGE plpgsql;
+
+with shop_id as (
+    select id from shops where name = 'testshop'
+)
+, query_serieses as (
+    select query_shop_serieses(id) as serieses from shop_id
+)
+select (serieses).* from query_serieses;
 
 DO $$
-    <<_>>
     DECLARE
-        user_id UUID;
-        invalid_id UUID := uuid_generate_v4();
+        shop_id UUID;
+        series_key UUID;
     BEGIN
-
-        RAISE INFO 'Testing function shop_add_member and error handling...';
-        
-        INSERT INTO users (username, password, name, email, phone)
-            VALUES ('david123', '123123', 'david', 'david123@mail.com', '0912312312')
-            RETURNING id INTO user_id;
-
-        INSERT INTO users (username, password, name, email, phone)
-            VALUES ('alice123', '123123', 'alice', 'alice123@mail.com', '0922312312');
-
-        PERFORM create_shop(user_id, 'davidshop');
-
-        PERFORM test(user_id, 'davidshop', 'alice123', '');
-        PERFORM test(user_id, 'davidshop', 'alice123', 'shop_user_shop_id_user_id_key');
-        PERFORM test(invalid_id, 'davidshop', 'alice123', 'permission_denied');
-        PERFORM test(invalid_id, 'invalid', 'alice123', 'shop_not_found');
-
-        RAISE INFO 'Done!';
-    EXCEPTION WHEN OTHERS THEN
-        DECLARE
-            c_name TEXT;
-        BEGIN
-            GET STACKED DIAGNOSTICS c_name = CONSTRAINT_NAME;
-            RAISE INFO 'Error code:%, name:%, msg:%', SQLSTATE, c_name, SQLERRM;
-        END;
+        SELECT id INTO shop_id FROM shops WHERE name = 'testshop';
+        SELECT key INTO series_key FROM query_shop_serieses(shop_id) WHERE name = 'series1';
+        PERFORM shop_update_series(shop_id, series_key, 'new_series');
     END;
 $$ LANGUAGE plpgsql;
+
+with select_shop as (
+    select id from shops where name = 'testshop'
+)
+, query_serieses as (
+    select query_shop_serieses(id) as serieses from select_shop
+)
+select (serieses).* from query_serieses;
+
+DO $$
+    DECLARE
+        shop_id UUID;
+        series_key UUID;
+    BEGIN
+        SELECT id INTO shop_id FROM shops WHERE name = 'testshop';
+        SELECT key INTO series_key FROM query_shop_serieses(shop_id) WHERE name = 'new_series';
+        PERFORM shop_delete_series(shop_id, series_key);
+    END;
+$$ LANGUAGE plpgsql;
+
+with select_shop as (
+    select id from shops where name = 'testshop'
+)
+,query_serieses as (
+    select query_shop_serieses(id) as serieses from select_shop
+)
+select (serieses).* from query_serieses;
+
 ROLLBACK;
-
-
-
--- Testing function shop_set_authority and error handling.
-BEGIN;
-CREATE OR REPLACE FUNCTION test (
-    user_id UUID,
-    shop_name TEXT,
-    member_name TEXT,
-    auth AUTHORITY,
-    perm PERMISSION,
-    error TEXT
-) RETURNS VOID AS $$
-    BEGIN
-        PERFORM shop_set_authority(user_id, shop_name, member_name, auth, perm);
-
-        IF error IS NOT NULL AND error != '' THEN
-            PERFORM raise_error('test_failed');
-        END IF;
-    EXCEPTION WHEN OTHERS THEN
-        DECLARE
-            c_name TEXT;
-        BEGIN
-            GET STACKED DIAGNOSTICS c_name = CONSTRAINT_NAME;
-            IF error IS NULL OR error = '' OR c_name != error THEN
-                RAISE EXCEPTION USING ERRCODE = SQLSTATE, MESSAGE = SQLERRM, CONSTRAINT = c_name;
-            END IF;
-        END;
-    END;
-$$ LANGUAGE plpgsql;
-
-DO $$
-    <<_>>
-    DECLARE
-        user_id UUID;
-        member_id UUID;
-        invalid_id UUID := uuid_generate_v4();
-    BEGIN
-        RAISE INFO 'Testing function shop_set_authority and error handling...';
-        
-        INSERT INTO users (username, password, name, email, phone)
-            VALUES ('david123', '123123', 'david', 'david123@mail.com', '0912312312')
-            RETURNING id INTO user_id;
-
-        INSERT INTO users (username, password, name, email, phone)
-            VALUES ('alice123', '123123', 'alice', 'alice123@mail.com', '0922312312')
-            RETURNING id INTO member_id;
-        
-        PERFORM create_shop(user_id, 'davidshop');
-        PERFORM shop_add_member(user_id, 'davidshop', 'alice123');
-
-        PERFORM test(user_id, 'davidshop', 'alice123', 'product_authority', 'all', '');
-        PERFORM test(invalid_id, 'davidshop', 'alice123', 'product_authority', 'none', 'permission_denied');
-        PERFORM test(user_id, 'davidshop', 'alice123', 'team_authority', 'all', '');
-        PERFORM test(member_id, 'davidshop', 'david123', 'store_authority', 'none', '');
-        PERFORM test(user_id, 'davidshop', 'invalid', 'product_authority', 'read-only' ,'user_not_found');
-
-        RAISE INFO 'Done!';
-    EXCEPTION WHEN OTHERS THEN
-        DECLARE
-            c_name TEXT;
-        BEGIN
-            GET STACKED DIAGNOSTICS c_name = CONSTRAINT_NAME;
-            RAISE INFO 'Error code:%, name:%, msg:%', SQLSTATE, c_name, SQLERRM;
-        END;
-    END;
-$$ LANGUAGE plpgsql;
-ROLLBACK;
-
-
-
--- Testing function shop_create_product and error handling.
-CREATE OR REPLACE FUNCTION test_shop_create_product (
-    shop_id UUID,
-    product PRODUCT,
-    error TEXT
-) RETURNS VOID AS $$
-    BEGIN
-        PERFORM shop_create_product(shop_id, product);
-
-        IF error IS NOT NULL AND error != '' THEN
-            PERFORM raise_error('test_failed');
-        END IF;
-    EXCEPTION WHEN OTHERS THEN
-        DECLARE
-            c_name TEXT;
-        BEGIN
-            GET STACKED DIAGNOSTICS c_name = CONSTRAINT_NAME;
-            IF error IS NULL OR error = '' OR c_name != error THEN
-                RAISE EXCEPTION USING ERRCODE = SQLSTATE, MESSAGE = SQLERRM, CONSTRAINT = c_name;
-            END IF;
-        END;
-    END;
-$$ LANGUAGE plpgsql;
-
-DO $$
-    <<_>>
-    DECLARE
-        user_id UUID;
-        shop_id UUID;
-        invalid_id UUID := uuid_generate_v4();
-        product PRODUCT;
-    BEGIN
-        RAISE INFO 'Testing function shop_create_product and error handling...';
-        
-        INSERT INTO users (username, password, name, email, phone)
-            VALUES ('david123', '123123', 'david', 'david123@mail.com', '0912312312')
-            RETURNING id INTO user_id;
-        
-        PERFORM create_shop(user_id, 'davidshop');
-        shop_id = (SELECT id FROM shops WHERE name = 'davidshop');
-        product = new_product('p1', 100);
-
-        PERFORM test_shop_create_product(shop_id, product, '');
-        PERFORM test_shop_create_product(shop_id, product, 'shop_duplicated_product');
-        product = new_product('p2', 200);
-        PERFORM test_shop_create_product(null, product, 'uuid_not_null');
-        PERFORM test_shop_create_product(invalid_id, product, 'shop_not_found');
-
-        DELETE FROM shop_user AS s WHERE s.user_id = _.user_id;
-        DELETE FROM shops WHERE name = 'davidshop';
-        DELETE FROM users WHERE id = user_id;
-
-        RAISE INFO 'Done!';
-    EXCEPTION WHEN OTHERS THEN
-        DECLARE
-            c_name TEXT;
-        BEGIN
-            GET STACKED DIAGNOSTICS c_name = CONSTRAINT_NAME;
-            RAISE INFO 'Error code:%, name:%, msg:%', SQLSTATE, c_name, SQLERRM;
-        END;
-    END;
-$$ LANGUAGE plpgsql;
-
-DROP FUNCTION test_shop_create_product;
-
-
-
--- Testing function shop_read_product and error handling.
-CREATE OR REPLACE FUNCTION test_shop_read_product (
-    shop_id UUID,
-    product_name TEXT,
-    error TEXT
-) RETURNS VOID AS $$
-    BEGIN
-        PERFORM shop_read_product(shop_id, product_name);
-
-        IF error IS NOT NULL AND error != '' THEN
-            PERFORM raise_error('test_failed');
-        END IF;
-    EXCEPTION WHEN OTHERS THEN
-        DECLARE
-            c_name TEXT;
-        BEGIN
-            GET STACKED DIAGNOSTICS c_name = CONSTRAINT_NAME;
-            IF error IS NULL OR error = '' OR c_name != error THEN
-                RAISE EXCEPTION USING ERRCODE = SQLSTATE, MESSAGE = SQLERRM, CONSTRAINT = c_name;
-            END IF;
-        END;
-    END;
-$$ LANGUAGE plpgsql;
-
-DO $$
-    <<_>>
-    DECLARE
-        user_id UUID;
-        shop_id UUID;
-        invalid_id UUID := uuid_generate_v4();
-    BEGIN
-        RAISE INFO 'Testing function shop_read_product and error handling...';
-        
-        INSERT INTO users (username, password, name, email, phone)
-            VALUES ('david123', '123123', 'david', 'david123@mail.com', '0912312312')
-            RETURNING id INTO user_id;
-        
-        PERFORM create_shop(user_id, 'davidshop');
-        shop_id = (SELECT id FROM shops WHERE name = 'davidshop');
-        PERFORM shop_create_product(shop_id, new_product('p1', 100));
-
-        PERFORM test_shop_read_product(shop_id, 'p1', '');
-        PERFORM test_shop_read_product(shop_id, 'p2', 'shop_product_not_found');
-        PERFORM test_shop_read_product(invalid_id, 'p1', 'shop_product_not_found');
-        PERFORM test_shop_read_product(null, 'p1', 'uuid_not_null');
-        PERFORM test_shop_read_product(shop_id, '', 'text_not_null');
-        PERFORM test_shop_read_product(shop_id, null, 'text_not_null');
-
-        DELETE FROM shop_user AS s WHERE s.user_id = _.user_id;
-        DELETE FROM shops WHERE name = 'davidshop';
-        DELETE FROM users WHERE id = user_id;
-
-        RAISE INFO 'Done!';
-    EXCEPTION WHEN OTHERS THEN
-        DECLARE
-            c_name TEXT;
-        BEGIN
-            GET STACKED DIAGNOSTICS c_name = CONSTRAINT_NAME;
-            RAISE INFO 'Error code:%, name:%, msg:%', SQLSTATE, c_name, SQLERRM;
-        END;
-    END;
-$$ LANGUAGE plpgsql;
-
-DROP FUNCTION test_shop_read_product;
-
-
-
--- Testing function shop_delete_product and error handling.
-CREATE OR REPLACE FUNCTION test_shop_delete_product (
-    shop_id UUID,
-    name TEXT,
-    id UUID,
-    error TEXT
-) RETURNS VOID AS $$
-    BEGIN
-        PERFORM shop_delete_product(shop_id, name, id);
-
-        IF error IS NOT NULL AND error != '' THEN
-            PERFORM raise_error('test_failed');
-        END IF;
-    EXCEPTION WHEN OTHERS THEN
-        DECLARE
-            c_name TEXT;
-        BEGIN
-            GET STACKED DIAGNOSTICS c_name = CONSTRAINT_NAME;
-            IF error IS NULL OR error = '' OR c_name != error THEN
-                RAISE EXCEPTION USING ERRCODE = SQLSTATE, MESSAGE = SQLERRM, CONSTRAINT = c_name;
-            END IF;
-        END;
-    END;
-$$ LANGUAGE plpgsql;
-
-DO $$
-    <<_>>
-    DECLARE
-        user_id UUID;
-        shop_id UUID;
-        product PRODUCT;
-        invalid_id UUID := uuid_generate_v4();
-    BEGIN
-        RAISE INFO 'Testing function shop_delete_product and error handling...';
-        
-        INSERT INTO users (username, password, name, email, phone)
-            VALUES ('david123', '123123', 'david', 'david123@mail.com', '0912312312')
-            RETURNING id INTO user_id;
-        
-        PERFORM create_shop(user_id, 'davidshop');
-        shop_id = (SELECT id FROM shops WHERE name = 'davidshop');
-        product = new_product('p1', 100);
-        PERFORM shop_create_product(shop_id, product);
-
-        PERFORM test_shop_delete_product(invalid_id, product.name, product.id, 'shop_not_found');
-        PERFORM test_shop_delete_product(shop_id, product.name, invalid_id, 'shop_product_mismatch');
-        PERFORM test_shop_delete_product(shop_id, product.name, product.id, '');
-        PERFORM test_shop_delete_product(shop_id, product.name, product.id, 'shop_product_not_found');
-        PERFORM test_shop_delete_product(null, product.name, product.id, 'uuid_not_null');
-        PERFORM test_shop_delete_product(shop_id, '', product.id, 'text_not_null');
-        PERFORM test_shop_delete_product(shop_id, null, product.id, 'text_not_null');
-        PERFORM test_shop_delete_product(shop_id, product.name, null, 'uuid_not_null');
-
-        DELETE FROM shop_user AS s WHERE s.user_id = _.user_id;
-        DELETE FROM shops WHERE name = 'davidshop';
-        DELETE FROM users WHERE id = user_id;
-
-        RAISE INFO 'Done!';
-    EXCEPTION WHEN OTHERS THEN
-        DECLARE
-            c_name TEXT;
-        BEGIN
-            GET STACKED DIAGNOSTICS c_name = CONSTRAINT_NAME;
-            RAISE INFO 'Error code:%, name:%, msg:%', SQLSTATE, c_name, SQLERRM;
-        END;
-    END;
-$$ LANGUAGE plpgsql;
-
-DROP FUNCTION test_shop_delete_product;
-
-
-
--- Testing function shop_update_product and error handling.
-CREATE OR REPLACE FUNCTION test_shop_update_product (
-    shop_id UUID,
-    product PRODUCT,
-    new_name TEXT,
-    error TEXT
-) RETURNS VOID AS $$
-    BEGIN
-        PERFORM shop_update_product(shop_id, product, new_name);
-
-        IF error IS NOT NULL AND error != '' THEN
-            PERFORM raise_error('test_failed');
-        END IF;
-    EXCEPTION WHEN OTHERS THEN
-        DECLARE
-            c_name TEXT;
-        BEGIN
-            GET STACKED DIAGNOSTICS c_name = CONSTRAINT_NAME;
-            IF error IS NULL OR error = '' OR c_name != error THEN
-                RAISE EXCEPTION USING ERRCODE = SQLSTATE, MESSAGE = SQLERRM, CONSTRAINT = c_name;
-            END IF;
-        END;
-    END;
-$$ LANGUAGE plpgsql;
-
-DO $$
-    <<_>>
-    DECLARE
-        user_id UUID;
-        shop_id UUID;
-        product PRODUCT;
-        invalid_id UUID := uuid_generate_v4();
-    BEGIN
-        RAISE INFO 'Testing function shop_update_product and error handling...';
-        
-        INSERT INTO users (username, password, name, email, phone)
-            VALUES ('david123', '123123', 'david', 'david123@mail.com', '0912312312')
-            RETURNING id INTO user_id;
-        
-        PERFORM create_shop(user_id, 'davidshop');
-        shop_id = (SELECT id FROM shops WHERE name = 'davidshop');
-        product = new_product('p1', 100);
-        PERFORM shop_create_product(shop_id, product);
-
-        PERFORM test_shop_update_product(shop_id, product, 'p2', '');
-        product.price = 200;
-        PERFORM test_shop_update_product(shop_id, product, '', 'shop_product_not_found');
-        product.name = 'p2';
-        PERFORM test_shop_update_product(shop_id, product, '', '');
-        PERFORM test_shop_update_product(shop_id, new_product('p2', 300), '', 'shop_product_mismatch');
-        PERFORM test_shop_update_product(invalid_id, product, '', 'shop_not_found');
-        PERFORM test_shop_update_product(shop_id, product, 'p2', 'shop_duplicated_product');
-        PERFORM test_shop_update_product(null, product, 'p3', 'uuid_not_null');
-        PERFORM test_shop_update_product(shop_id, null, 'p3', 'product_not_null');
-        PERFORM test_shop_update_product(shop_id, product, 'p3', '');
-
-        DELETE FROM shop_user AS s WHERE s.user_id = _.user_id;
-        DELETE FROM shops WHERE name = 'davidshop';
-        DELETE FROM users WHERE id = user_id;
-
-        RAISE INFO 'Done!';
-    EXCEPTION WHEN OTHERS THEN
-        DECLARE
-            c_name TEXT;
-        BEGIN
-            GET STACKED DIAGNOSTICS c_name = CONSTRAINT_NAME;
-            RAISE INFO 'Error code:%, name:%, msg:%', SQLSTATE, c_name, SQLERRM;
-        END;
-    END;
-$$ LANGUAGE plpgsql;
-
-DROP FUNCTION test_shop_update_product;

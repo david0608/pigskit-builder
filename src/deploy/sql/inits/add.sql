@@ -1,6 +1,12 @@
 -- Domain TEXT_NN.
 CREATE DOMAIN TEXT_NN AS TEXT
     CONSTRAINT text_not_null CHECK (
+        LENGTH(VALUE) > 0
+    );
+
+-- Domain TEXT_NZ.
+CREATE DOMAIN TEXT_NZ AS TEXT
+    CONSTRAINT text_not_zero CHECK (
         VALUE IS NOT NULL AND LENGTH(VALUE) > 0
     );
 

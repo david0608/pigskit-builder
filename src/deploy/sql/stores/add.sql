@@ -1,7 +1,7 @@
 -- Stores table.
 CREATE TABLE stores (
     id                              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    name                            TEXT_NN,
+    name                            TEXT_NZ,
     name_upper                      TEXT,
     shop_id                         UUID_NN REFERENCES shops(id),
     latest_update                   TS_NN DEFAULT NOW(),
@@ -40,7 +40,7 @@ CREATE TABLE store_user (
 
 -- Stores errors.
 INSERT INTO errors (code, name, message) VALUES
-    ('C6005', 'store_user_update_authority_failed', 'Failed to update store_user authority.');
+    ('C7005', 'store_user_update_authority_failed', 'Failed to update store_user authority.');
 
 
 
@@ -48,7 +48,7 @@ INSERT INTO errors (code, name, message) VALUES
 CREATE OR REPLACE FUNCTION create_store (
     user_id UUID_NN,
     shop_id UUID_NN,
-    store_name TEXT_NN
+    store_name TEXT_NZ
 ) RETURNS void AS $$
     DECLARE
         store_id UUID;
@@ -76,7 +76,7 @@ $$ LANGUAGE plpgsql;
 CREATE OR REPLACE FUNCTION check_store_user_authority (
     store_id UUID_NN,
     user_id UUID_NN,
-    auth_name TEXT_NN,
+    auth_name TEXT_NZ,
     auth_perm PERMISSION_NN,
     OUT ok BOOLEAN
 ) AS $$
