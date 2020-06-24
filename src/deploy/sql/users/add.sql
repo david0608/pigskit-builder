@@ -3,19 +3,28 @@ CREATE TABLE users (
     id              UUID_NN PRIMARY KEY DEFAULT uuid_generate_v4(),
     username        TEXT_NZ UNIQUE,
     password        TEXT_NZ,
-    name            TEXT_NZ,
     email           TEXT_NZ UNIQUE,
-    phone           TEXT_NZ UNIQUE
+    phone           TEXT_NZ UNIQUE,
+    nickname        TEXT
+);
+
+
+
+-- User register session table.
+CREATE TABLE user_register_session (
+    id              UUID_NN PRIMARY KEY,
+    username        TEXT,
+    password        TEXT,
+    email           TEXT,
+    phone           TEXT,
+    generate_at     TIMESTAMPTZ DEFAULT now()
 );
 
 
 
 -- Users errors.
 INSERT INTO errors (code, name, message) VALUES
-    ('C1001', 'users_username_key', 'Username has been registered.'),
-    ('C1002', 'users_email_key', 'Email has been registered.'),
-    ('C1003', 'users_phone_key', 'Phone number has been registered.'),
-    ('C1004', 'user_not_found', 'User not found.');
+    ('C1001', 'user_not_found', 'User not found.');
 
 
 
@@ -33,23 +42,23 @@ $$ LANGUAGE plpgsql;
 
 
 
--- Register and user.
+-- Register an user.
 CREATE OR REPLACE FUNCTION register_user (
-    username TEXT_NZ,
-    password TEXT_NZ,
-    name TEXT_NZ,
-    email TEXT_NZ,
-    phone TEXT_NZ
-) RETURNS VOID AS $$
+    regssid UUID,
+    OUT ok BOOLEAN
+) AS $$
+    DECLARE
+        inserted UUID;
     BEGIN
-        INSERT INTO users(username, password, name, email, phone)
-            VALUES (username, password, name, email, phone);
+        INSERT INTO users (username, password, email, phone)
+            SELECT username, password, email, phone FROM user_register_session WHERE id = regssid
+            RETURNING id INTO inserted;
+
+        DELETE FROM user_register_session WHERE id = regssid;
+
+        ok := inserted IS NOT NULL;
     EXCEPTION WHEN OTHERS THEN
-        DECLARE
-            c_name TEXT;
-        BEGIN
-            GET STACKED DIAGNOSTICS c_name = CONSTRAINT_NAME;
-            PERFORM raise_error(c_name);
-        END;
+        DELETE FROM user_register_session WHERE id = regssid;
+        ok := false;
     END;
 $$ LANGUAGE plpgsql;

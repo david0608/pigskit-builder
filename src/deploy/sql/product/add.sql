@@ -39,7 +39,7 @@ CREATE OR REPLACE FUNCTION product_create_customize (
         cus = customize_create(
             payload ->> 'name',
             payload ->> 'description',
-            payload -> 'options'
+            payload -> 'selections'
         );
         prod.customizes = prod.customizes || hstore(format('%s', key), format('%s', cus));
     END;

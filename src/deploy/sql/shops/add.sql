@@ -28,6 +28,7 @@ EXECUTE PROCEDURE shop_name_auto_upper();
 
 -- Shops errors.
 INSERT INTO errors (code, name, message) VALUES
+    ('C5001', 'shop_name_used', 'Shop name has been used.'),
     ('C5003', 'shop_not_found', 'Shop not found.'),
     ('C5009', 'shop_product_not_found', 'Product not found for the shop.');
 
@@ -55,6 +56,10 @@ CREATE OR REPLACE FUNCTION create_shop (
     DECLARE
         shop_id UUID;
     BEGIN
+        IF (SELECT name FROM shops WHERE name = shop_name) IS NOT NULL THEN
+            PERFORM raise_error('shop_name_used');
+        END IF;
+        
         INSERT INTO shops(name) VALUES (shop_name) RETURNING id INTO shop_id;
         INSERT INTO shop_user (
             shop_id,

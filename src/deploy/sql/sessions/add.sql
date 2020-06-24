@@ -9,7 +9,6 @@ CREATE TABLE sessions (
 
 -- Sessions errors.
 INSERT INTO errors (code, name, message) VALUES
-    ('C2001', 'invalid_username_password', 'Invalid username or password.'),
     ('C2002', 'session_expired', 'Session expired.');
 
 
@@ -26,11 +25,9 @@ CREATE OR REPLACE FUNCTION signin_user (
         SELECT id INTO user_id FROM users AS t
             WHERE t.username = signin_user.username AND t.password = signin_user.password;
 
-        IF user_id IS NULL THEN
-            PERFORM raise_error('invalid_username_password');
+        IF user_id IS NOT NULL THEN
+            INSERT INTO sessions (user_id) VALUES (user_id) RETURNING id INTO session_id;
         END IF;
-
-        INSERT INTO sessions (user_id) VALUES (user_id) RETURNING id INTO session_id;
     END;
 $$ LANGUAGE plpgsql;
 

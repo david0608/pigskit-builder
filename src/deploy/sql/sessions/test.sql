@@ -45,8 +45,6 @@ DO $$
 
         PERFORM test_signin_user('david123', '123123', user_id, '');
         PERFORM test_signin_user('david123', '123123', user_id, '');
-        PERFORM test_signin_user('david1234', '123123', user_id, 'invalid_username_password');
-        PERFORM test_signin_user('david123', '1231234', user_id, 'invalid_username_password');
         PERFORM test_signin_user('', '123123', user_id, 'text_not_null');
         PERFORM test_signin_user(null, '123123', user_id, 'text_not_null');
         PERFORM test_signin_user('david123', '', user_id, 'text_not_null');

@@ -1,14 +1,14 @@
 DROP FUNCTION customize_update;
 DROP FUNCTION customize_create;
-DROP FUNCTION customize_update_option;
-DROP FUNCTION customize_delete_option;
-DROP FUNCTION customize_read_option;
-DROP FUNCTION customize_create_option;
-DROP FUNCTION query_customize_options;
-DROP FUNCTION option_update;
-DROP FUNCTION option_create;
+DROP FUNCTION customize_update_selection;
+DROP FUNCTION customize_delete_selection;
+DROP FUNCTION customize_read_selection;
+DROP FUNCTION customize_create_selection;
+DROP FUNCTION query_customize_selections;
+DROP FUNCTION selection_update;
+DROP FUNCTION selection_create;
 
 DROP DOMAIN CUSTOMIZE_NN;
 DROP TYPE CUSTOMIZE;
-DROP DOMAIN OPTION_NN;
-DROP TYPE OPTION;
+DROP DOMAIN SELECTION_NN;
+DROP TYPE SELECTION;

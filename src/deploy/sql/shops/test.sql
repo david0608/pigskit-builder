@@ -6,12 +6,14 @@ DO $$
         prod PRODUCT;
         cus_key UUID;
         cus CUSTOMIZE;
-        opt_key UUID;
-        opt OPTION;
+        sel_key UUID;
+        sel SELECTION;
         payload TEXT_NN;
     BEGIN
+        -- Create a shop for the test.
         INSERT INTO shops(name) VALUES ('testshop') RETURNING id INTO shop_id;
 
+        -- Create a product.
         payload = jsonb_build_object(
             'name', 'prod1',
             'description', 'product 1.',
@@ -21,9 +23,9 @@ DO $$
                 jsonb_build_object(
                     'name', 'cus1',
                     'description', 'customize 1.',
-                    'options', jsonb_build_array(
+                    'selections', jsonb_build_array(
                         jsonb_build_object(
-                            'name', 'opt1',
+                            'name', 'sel1',
                             'price', 100
                         )
                     )
@@ -32,18 +34,25 @@ DO $$
         );
         perform shop_create_product(shop_id, payload);
 
+        -- Get product key.
         select key into prod_key from query_shop_products(shop_id) where (product).name = 'prod1';
+        -- Read the product just created.
         prod = shop_read_product(shop_id, prod_key);
         raise info '%', prod;
 
+        -- Get customize key.
         select key into cus_key from query_product_customizes(prod) where (customize).name = 'cus1';
+        -- Read the customize just created.
         cus = product_read_customize(prod, cus_key);
         raise info '%', cus;
 
-        select key into opt_key from query_customize_options(cus) where (option).name = 'opt1';
-        opt = customize_read_option(cus, opt_key);
-        raise info '%', opt;
+        -- Get selection key.
+        select key into sel_key from query_customize_selections(cus) where (selection).name = 'sel1';
+        -- Read the selection just created.
+        sel = customize_read_selection(cus, sel_key);
+        raise info '%', sel;
 
+        -- Update the product just created.
         payload = jsonb_build_object(
             'name', 'prod_u',
             'description', 'product updated.',
@@ -55,13 +64,13 @@ DO $$
                     'description', 'customize updated.',
                     'create', jsonb_build_array(
                         jsonb_build_object(
-                            'name', 'opt_c',
+                            'name', 'sel_c',
                             'price', 200
                         )
                     ),
                     'update', jsonb_build_object(
-                        opt_key, jsonb_build_object(
-                            'name', 'opt_u',
+                        sel_key, jsonb_build_object(
+                            'name', 'sel_u',
                             'price', 1000
                         )
                     )
@@ -70,9 +79,11 @@ DO $$
         );
         perform shop_update_product(shop_id, prod_key, payload);
 
+        -- Read the product just updated.
         prod = shop_read_product(shop_id, prod_key);
         raise info '%', prod;
 
+        -- Delete a old customize and create a new customize through update product.
         payload = jsonb_build_object(
             'delete', jsonb_build_array(cus_key),
             'create', jsonb_build_array(
@@ -84,18 +95,22 @@ DO $$
         );
         perform shop_update_product(shop_id, prod_key, payload);
 
+        -- Get the product just updated.
         prod = shop_read_product(shop_id, prod_key);
         raise info '%', prod;
 
+        -- Get the customize just created.
         select key into cus_key from query_product_customizes(prod) where (customize).name = 'cus3';
         cus = product_read_customize(prod, cus_key);
         raise info '%', cus;
 
+        -- Delete the customize through update product.
         payload = jsonb_build_object(
             'delete', jsonb_build_array(cus_key)
         );
         perform shop_update_product(shop_id, prod_key, payload);
 
+        -- Get the product just updated.
         prod = shop_read_product(shop_id, prod_key);
         raise info '%', prod;
     END;
@@ -109,11 +124,14 @@ DO $$
     DECLARE
         shop_id UUID;
     BEGIN
+        -- Create a shop for the test.
         INSERT INTO shops(name) VALUES ('testshop') RETURNING id INTO shop_id;
+        -- Create a new series for the shops.
         PERFORM shop_create_series(shop_id, 'series1');
     END;
 $$ LANGUAGE plpgsql;
 
+-- Query serieses of the shop.
 with shop_id as (
     select id from shops where name = 'testshop'
 )
@@ -129,10 +147,12 @@ DO $$
     BEGIN
         SELECT id INTO shop_id FROM shops WHERE name = 'testshop';
         SELECT key INTO series_key FROM query_shop_serieses(shop_id) WHERE name = 'series1';
+        -- Update the series just created.
         PERFORM shop_update_series(shop_id, series_key, 'new_series');
     END;
 $$ LANGUAGE plpgsql;
 
+-- Query serieses of the shop.
 with select_shop as (
     select id from shops where name = 'testshop'
 )
@@ -148,10 +168,12 @@ DO $$
     BEGIN
         SELECT id INTO shop_id FROM shops WHERE name = 'testshop';
         SELECT key INTO series_key FROM query_shop_serieses(shop_id) WHERE name = 'new_series';
+        -- Delete the series.        
         PERFORM shop_delete_series(shop_id, series_key);
     END;
 $$ LANGUAGE plpgsql;
 
+-- Query serieses of the shop.
 with select_shop as (
     select id from shops where name = 'testshop'
 )

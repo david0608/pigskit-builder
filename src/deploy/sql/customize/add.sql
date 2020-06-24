@@ -1,17 +1,17 @@
--- Option type.
-CREATE TYPE OPTION AS (
+-- Selection type.
+CREATE TYPE SELECTION AS (
     name                TEXT_NZ,
     price               INT_NN
 );
 
---Domain OPTION_NN
-CREATE DOMAIN OPTION_NN AS OPTION NOT NULL;
+--Domain SELECTION_NN
+CREATE DOMAIN SELECTION_NN AS SELECTION NOT NULL;
 
 -- Customize type.
 CREATE TYPE CUSTOMIZE AS (
     name                TEXT_NZ,
     description         TEXT,
-    options             HSTORE_NN,
+    selections          HSTORE_NN,
     latest_update       TS_NN
 );
 
@@ -20,30 +20,30 @@ CREATE DOMAIN CUSTOMIZE_NN AS CUSTOMIZE NOT NULL;
 
 
 
--- Create a new option.
-CREATE OR REPLACE FUNCTION option_create (
+-- Create a new selection.
+CREATE OR REPLACE FUNCTION selection_create (
     name TEXT_NZ,
     price INT_NN
-) RETURNS OPTION AS $$
+) RETURNS SELECTION AS $$
     BEGIN
-        RETURN (name, price)::OPTION;
+        RETURN (name, price)::SELECTION;
     END;
 $$ LANGUAGE plpgsql;
 
 
 
--- Update current option.
-CREATE OR REPLACE FUNCTION option_update (
-    INOUT opt OPTION_NN,
+-- Update current selection.
+CREATE OR REPLACE FUNCTION selection_update (
+    INOUT sel SELECTION_NN,
     payload JSONB
 ) AS $$
     BEGIN
         IF payload IS NOT NULL THEN
             IF payload ? 'name' THEN
-                opt.name = payload ->> 'name';
+                sel.name = payload ->> 'name';
             END IF;
             IF payload ? 'price' THEN
-                opt.price = payload ->> 'price';
+                sel.price = payload ->> 'price';
             END IF;
         END IF;
     END;
@@ -51,78 +51,78 @@ $$ LANGUAGE plpgsql;
 
 
 
--- Query all options of the customize.
-CREATE OR REPLACE FUNCTION query_customize_options (
+-- Query all selections of the customize.
+CREATE OR REPLACE FUNCTION query_customize_selections (
     cus CUSTOMIZE_NN
 ) RETURNS TABLE (
     key UUID_NN,
-    option OPTION
+    selection SELECTION
 ) AS $$
     BEGIN
-        RETURN QUERY SELECT ((each).key)::UUID_NN, ((each).value)::OPTION FROM each(cus.options);
+        RETURN QUERY SELECT ((each).key)::UUID_NN, ((each).value)::SELECTION FROM each(cus.selections);
     END;
 $$ LANGUAGE plpgsql;
 
 
 
--- Function that create a option for the customize.
-CREATE OR REPLACE FUNCTION customize_create_option (
+-- Function that create a selection for the customize.
+CREATE OR REPLACE FUNCTION customize_create_selection (
     INOUT cus CUSTOMIZE_NN,
     payload JSONB
 ) AS $$
     DECLARE
-        opt OPTION;
+        sel SELECTION;
         _k UUID := uuid_generate_v4();
     BEGIN
-        opt = option_create(
+        sel = selection_create(
             payload ->> 'name',
             (payload ->> 'price')::INT_NN
         );
-        cus.options = cus.options || hstore(format('%s', _k), format('%s', opt));
+        cus.selections = cus.selections || hstore(format('%s', _k), format('%s', sel));
     END;
 $$ LANGUAGE plpgsql;
 
 
 
--- Read an option of the customize.
-CREATE OR REPLACE FUNCTION customize_read_option (
+-- Read a selection of the customize.
+CREATE OR REPLACE FUNCTION customize_read_selection (
     cus CUSTOMIZE_NN,
-    opt_key UUID_NN,
-    OUT opt OPTION
+    sel_key UUID_NN,
+    OUT sel SELECTION
 ) AS $$
     BEGIN
-        opt = (cus.options -> format('%s', opt_key))::OPTION;
+        sel = (cus.selections -> format('%s', sel_key))::SELECTION;
     END;
 $$ LANGUAGE plpgsql;
 
 
 
--- Drop an option of the customize.
-CREATE OR REPLACE FUNCTION customize_delete_option (
+-- Drop a selection of the customize.
+CREATE OR REPLACE FUNCTION customize_delete_selection (
     INOUT cus CUSTOMIZE_NN,
-    opt_key UUID_NN
+    sel_key UUID_NN
 ) AS $$
     BEGIN
-        cus.options = cus.options - format('%s', opt_key);
+        cus.selections = cus.selections - format('%s', sel_key);
     END;
 $$ LANGUAGE plpgsql;
 
 
 
--- Update an option of the customize.
-CREATE OR REPLACE FUNCTION customize_update_option (
+-- Update a selection of the customize.
+CREATE OR REPLACE FUNCTION customize_update_selection (
     INOUT cus CUSTOMIZE_NN,
-    opt_key UUID_NN,
+    sel_key UUID_NN,
     payload jsonb
 ) AS $$
     DECLARE
-        opt OPTION;
+        sel SELECTION;
     BEGIN
-        opt = customize_read_option(cus, opt_key);
-        IF opt IS NOT NULL THEN
-            opt = option_update(opt, payload);
-            cus = customize_delete_option(cus, opt_key);
-            cus.options = cus.options || hstore(format('%s', opt_key), format('%s', opt));
+        sel = customize_read_selection(cus, sel_key);
+        IF sel IS NOT NULL THEN
+            sel = selection_update(sel, payload);
+            cus = customize_delete_selection(cus, sel_key);
+            cus.selections = cus.selections || hstore(format('%s', sel_key), format('%s', sel));
             cus.latest_update = now();
         END IF;
     END;
@@ -134,16 +134,16 @@ $$ LANGUAGE plpgsql;
 CREATE OR REPLACE FUNCTION customize_create (
     name TEXT_NZ,
     description TEXT,
-    options JSONB
+    selections JSONB
 ) RETURNS CUSTOMIZE AS $$
     DECLARE
         cus CUSTOMIZE;
-        option JSONB;
+        selection JSONB;
     BEGIN
         cus = (name, description, '', now())::CUSTOMIZE;
 
-        FOR option IN SELECT jsonb_array_elements(options) LOOP
-            cus = customize_create_option(cus, option);
+        FOR selection IN SELECT jsonb_array_elements(selections) LOOP
+            cus = customize_create_selection(cus, selection);
         END LOOP;
 
         RETURN cus;
@@ -158,8 +158,8 @@ CREATE OR REPLACE FUNCTION customize_update (
     payload JSONB
 ) AS $$
     DECLARE
-        opt_key UUID;
-        opt_payload JSONB;
+        sel_key UUID;
+        sel_payload JSONB;
     BEGIN
         IF payload ? 'name' THEN
             cus.name = payload ->> 'name';
@@ -169,16 +169,16 @@ CREATE OR REPLACE FUNCTION customize_update (
             cus.description = payload ->> 'description';
         END IF;
 
-        FOR opt_key IN SELECT jsonb_array_elements_text(payload -> 'delete') LOOP
-            cus = customize_delete_option(cus, opt_key);
+        FOR sel_key IN SELECT jsonb_array_elements_text(payload -> 'delete') LOOP
+            cus = customize_delete_selection(cus, sel_key);
         END LOOP;
 
-        FOR opt_payload IN SELECT jsonb_array_elements(payload -> 'create') LOOP
-            cus = customize_create_option(cus, opt_payload);
+        FOR sel_payload IN SELECT jsonb_array_elements(payload -> 'create') LOOP
+            cus = customize_create_selection(cus, sel_payload);
         END LOOP;
 
-        FOR opt_key, opt_payload IN SELECT key, value FROM jsonb_each(payload -> 'update') LOOP
-            cus = customize_update_option(cus, opt_key, opt_payload);
+        FOR sel_key, sel_payload IN SELECT key, value FROM jsonb_each(payload -> 'update') LOOP
+            cus = customize_update_selection(cus, sel_key, sel_payload);
         END LOOP;
     END;
 $$ LANGUAGE plpgsql;

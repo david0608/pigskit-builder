@@ -6,8 +6,8 @@ DO $$
         cus_key1 UUID;
         cus_key2 UUID;
         cus2 CUSTOMIZE;
-        opt_key1 UUID;
-        opt_key2 UUID;
+        sel_key1 UUID;
+        sel_key2 UUID;
         payload JSONB;
     BEGIN
         prod = product_create(
@@ -19,13 +19,13 @@ DO $$
                 {
                     "name": "cus1",
                     "description": "customize 1.",
-                    "options": [
+                    "selections": [
                         {
-                            "name": "opt1",
+                            "name": "sel1",
                             "price": 100
                         },
                         {
-                            "name": "opt2",
+                            "name": "sel2",
                             "price": 200
                         }
                     ]
@@ -33,13 +33,13 @@ DO $$
                 {
                     "name": "cus2",
                     "description": "customize 2.",
-                    "options": [
+                    "selections": [
                         {
-                            "name": "opt3",
+                            "name": "sel3",
                             "price": 300
                         },
                         {
-                            "name": "opt4",
+                            "name": "sel4",
                             "price": 400
                         }
                     ]
@@ -50,8 +50,8 @@ DO $$
         select key into cus_key2 from query_product_customizes(prod) where (customize).name = 'cus2';
 
         cus2 = product_read_customize(prod, cus_key2);
-        select key into opt_key1 from query_customize_options(cus2) where (option).name = 'opt3';
-        select key into opt_key2 from query_customize_options(cus2) where (option).name = 'opt4';
+        select key into sel_key1 from query_customize_selections(cus2) where (selection).name = 'sel3';
+        select key into sel_key2 from query_customize_selections(cus2) where (selection).name = 'sel4';
 
         raise info '%', prod;
 
@@ -64,9 +64,9 @@ DO $$
             'create', jsonb_build_array('{
                 "name": "cus3",
                 "description": "csutomize 3.",
-                "options": [
+                "selections": [
                     {
-                        "name": "opt5",
+                        "name": "sel5",
                         "price": 500
                     }
                 ]
@@ -75,10 +75,10 @@ DO $$
                 cus_key2, jsonb_build_object(
                     'name', 'cus_test',
                     'description', 'customize test',
-                    'delete', jsonb_build_array(opt_key1),
-                    'create', jsonb_build_array('{ "name": "opt5", "price": 500 }'::JSONB),
+                    'delete', jsonb_build_array(sel_key1),
+                    'create', jsonb_build_array('{ "name": "sel5", "price": 500 }'::JSONB),
                     'update', jsonb_build_object(
-                        opt_key2, '{ "price": 700 }'::JSONB
+                        sel_key2, '{ "price": 700 }'::JSONB
                     )
                 )
             )
@@ -104,13 +104,13 @@ ROLLBACK;
 --             {
 --                 "name": "cus1",
 --                 "description": "csutomize 1.",
---                 "options": [
+--                 "selections": [
 --                     {
---                         "name": "opt1",
+--                         "name": "sel1",
 --                         "price": 100
 --                     },
 --                     {
---                         "name": "opt2",
+--                         "name": "sel2",
 --                         "price": 200
 --                     }
 --                 ]
@@ -118,13 +118,13 @@ ROLLBACK;
 --             {
 --                 "name": "cus2",
 --                 "description": "csutomize 2.",
---                 "options": [
+--                 "selections": [
 --                     {
---                         "name": "opt3",
+--                         "name": "sel3",
 --                         "price": 100
 --                     },
 --                     {
---                         "name": "opt4",
+--                         "name": "sel4",
 --                         "price": 200
 --                     }
 --                 ]
