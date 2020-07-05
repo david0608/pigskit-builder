@@ -56,10 +56,10 @@ CREATE OR REPLACE FUNCTION create_shop (
     DECLARE
         shop_id UUID;
     BEGIN
-        IF (SELECT name FROM shops WHERE name = shop_name) IS NOT NULL THEN
+        IF (SELECT name FROM shops WHERE name_upper = upper(shop_name)) IS NOT NULL THEN
             PERFORM raise_error('shop_name_used');
         END IF;
-        
+
         INSERT INTO shops(name) VALUES (shop_name) RETURNING id INTO shop_id;
         INSERT INTO shop_user (
             shop_id,
