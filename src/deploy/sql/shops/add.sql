@@ -99,8 +99,9 @@ $$ LANGUAGE plpgsql;
 -- Create a product for the shop.
 CREATE OR REPLACE FUNCTION shop_create_product (
     shop_id UUID_NN,
-    payload TEXT_NN
-) RETURNS VOID AS $$
+    payload TEXT_NN,
+    OUT product_key UUID
+) AS $$
     <<_>>
     DECLARE
         products hstore;
@@ -113,17 +114,18 @@ CREATE OR REPLACE FUNCTION shop_create_product (
             PERFORM raise_error('shop_not_found');
         END IF;
 
-        _.payload = shop_create_product.payload::JSONB;
+        _.payload := shop_create_product.payload::JSONB;
 
-        prod = product_create(
+        prod := product_create(
             _.payload ->> 'name',
             _.payload ->> 'description',
             (_.payload ->> 'price')::INTEGER,
             (_.payload ->> 'series_id')::UUID,
             _.payload -> 'customizes'
         );
+        product_key := uuid_generate_v4();
 
-        products = products || hstore(format('%s', uuid_generate_v4()), format('%s', prod));
+        products := products || hstore(format('%s', product_key), format('%s', prod));
         UPDATE shops SET products = _.products WHERE id = shop_id;
     END;
 $$ LANGUAGE plpgsql;

@@ -32,10 +32,8 @@ DO $$
                 )
             )
         );
-        perform shop_create_product(shop_id, payload);
+        select product_key into prod_key from shop_create_product(shop_id, payload);
 
-        -- Get product key.
-        select key into prod_key from query_shop_products(shop_id) where (product).name = 'prod1';
         -- Read the product just created.
         prod = shop_read_product(shop_id, prod_key);
         raise info '%', prod;
