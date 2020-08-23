@@ -61,6 +61,9 @@ CREATE OR REPLACE FUNCTION create_shop (
         END IF;
 
         INSERT INTO shops(name) VALUES (shop_name) RETURNING id INTO shop_id;
+
+        INSERT INTO shop_order_number_sequence(shop_id) VALUES (shop_id);
+
         INSERT INTO shop_user (
             shop_id,
             user_id,
@@ -207,6 +210,23 @@ $$ LANGUAGE plpgsql;
 
 
 
+-- Set has_picture of a product of the shop.
+CREATE OR REPLACE FUNCTION shop_set_product_has_picture (
+    shop_id UUID_NN,
+    prod_key UUID_NN,
+    has_picture BOOLEAN
+) RETURNS void AS $$
+    BEGIN
+        PERFORM shop_update_product(
+            shop_id,
+            prod_key,
+            (json_build_object('has_picture', has_picture))::TEXT
+        );
+    END;
+$$ LANGUAGE plpgsql;
+
+
+
 -- Qeury all serieses of the shop;
 CREATE OR REPLACE FUNCTION query_shop_serieses (
     shop_id UUID_NN
@@ -292,5 +312,115 @@ CREATE OR REPLACE FUNCTION shop_update_series (
         ELSE
             PERFORM raise_error('shop_series_not_found');
         END IF;
+    END;
+$$ LANGUAGE plpgsql;
+
+
+
+-- Shop_user table.
+CREATE TABLE shop_user (
+    id                      UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    shop_id                 UUID_NN REFERENCES shops(id),
+    user_id                 UUID_NN REFERENCES users(id),
+    team_authority          PERMISSION_NN DEFAULT 'none',
+    store_authority         PERMISSION_NN DEFAULT 'read-only',
+    product_authority       PERMISSION_NN DEFAULT 'read-only',
+    UNIQUE(shop_id, user_id)
+);
+
+
+
+-- Shop_User errors.
+INSERT INTO errors (code, name, message) VALUES
+    ('C6001', 'shop_user_update_authority_failed', 'Failed to update shop_user authority.');
+
+
+
+-- Chech shop user authority.
+CREATE OR REPLACE FUNCTION check_shop_user_authority (
+    shop_id UUID_NN,
+    user_id UUID_NN,
+    auth AUTHORITY_NN,
+    perm PERMISSION_NN,
+    OUT ok BOOLEAN
+) AS $$
+    DECLARE
+        _perm PERMISSION;
+    BEGIN
+        EXECUTE 'SELECT t.' || auth || ' FROM shop_user AS t WHERE t.shop_id = $1 AND t.user_id = $2'
+            INTO _perm
+            USING shop_id, user_id;
+        
+        IF _perm = perm::PERMISSION THEN
+            ok := true;
+        ELSE
+            ok := false;
+        END IF;
+    END;
+$$ LANGUAGE plpgsql;
+
+
+
+-- Add a new shop_user by shop member.
+CREATE OR REPLACE FUNCTION shop_user_create (
+    user_id UUID_NN,
+    shop_id UUID_NN,
+    member_id UUID_NN
+) RETURNS void AS $$
+    BEGIN
+        IF NOT check_shop_user_authority(shop_id, user_id, 'team_authority', 'all') THEN
+            PERFORM raise_error('permission_denied');
+        END IF;
+        INSERT INTO shop_user (shop_id, user_id) VALUES (shop_id, member_id);
+    END;
+$$ LANGUAGE plpgsql;
+
+
+
+-- Update authority of a shop user.
+CREATE OR REPLACE FUNCTION shop_user_update_authority (
+    user_id UUID_NN,
+    shop_id UUID_NN,
+    member_id UUID_NN,
+    auth AUTHORITY_NN,
+    perm PERMISSION_NN
+) RETURNS void AS $$
+    DECLARE
+        updated UUID;
+    BEGIN
+        IF NOT check_shop_user_authority(shop_id, user_id, 'team_authority', 'all') THEN
+            PERFORM raise_error('permission_denied');
+        END IF;
+
+        EXECUTE 'UPDATE shop_user SET ' || auth || ' = $1 WHERE shop_id = $2 AND user_id = $3 RETURNING id'
+            INTO updated
+            USING perm, shop_id, member_id;
+
+        IF updated IS NULL THEN
+            PERFORM raise_error('shop_user_update_authority_failed');
+        END IF;
+    END;
+$$ LANGUAGE plpgsql;
+
+
+
+-- Shop order number sequence table.
+CREATE TABLE shop_order_number_sequence (
+    shop_id             UUID UNIQUE REFERENCES shops(id) NOT NULL,
+    current_number      INTEGER DEFAULT 0
+);
+
+
+
+-- Get next order number of the shop.
+CREATE OR REPLACE FUNCTION shop_next_order_number (
+    shop_id UUID_NN,
+    OUT next_number INTEGER
+) AS $$
+    BEGIN
+        UPDATE shop_order_number_sequence AS t
+        SET current_number = current_number + 1
+        WHERE t.shop_id = shop_next_order_number.shop_id
+        RETURNING current_number INTO next_number;
     END;
 $$ LANGUAGE plpgsql;

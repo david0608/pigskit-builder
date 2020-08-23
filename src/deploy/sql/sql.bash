@@ -9,10 +9,11 @@ database_objs=(
     errors
     users
     sessions
+    guest_session
     customize
     product
     shops
-    shop_user
+    cart
     stores
 )
 

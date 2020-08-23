@@ -60,6 +60,7 @@ DO $$
             'description', 'test product.',
             'price', 2000,
             'series_id', uuid_generate_v4(),
+            'has_picture', true,
             'delete', jsonb_build_array(cus_key1),
             'create', jsonb_build_array('{
                 "name": "cus3",

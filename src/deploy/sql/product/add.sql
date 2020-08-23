@@ -4,6 +4,7 @@ CREATE TYPE PRODUCT AS (
     description         TEXT,
     price               INT_NN,
     series_id           UUID,
+    has_picture         BOOLEAN,
     customizes          HSTORE_NN,
     latest_update       TS_NN
 );
@@ -105,7 +106,15 @@ CREATE OR REPLACE FUNCTION product_create (
         prod PRODUCT;
         customize JSONB;
     BEGIN
-        prod = (name, description, price, series_id, '', now())::PRODUCT;
+        prod = (
+            name,
+            description,
+            price,
+            series_id,
+            false,
+            '',
+            now()
+        )::PRODUCT;
         
         FOR customize IN SELECT jsonb_array_elements(customizes) LOOP
             prod = product_create_customize(prod, customize);
@@ -140,6 +149,10 @@ CREATE OR REPLACE FUNCTION product_update (
 
         IF payload ? 'series_id' THEN
             prod.series_id = payload ->> 'series_id';
+        END IF;
+
+        IF payload ? 'has_picture' THEN
+            prod.has_picture = payload ->> 'has_picture';
         END IF;
 
         FOR cus_key IN SELECT jsonb_array_elements_text(payload -> 'delete') LOOP
