@@ -10,10 +10,9 @@ database_objs=(
     users
     sessions
     guest_session
-    customize
     product
     shops
-    cart
+    order
     stores
 )
 

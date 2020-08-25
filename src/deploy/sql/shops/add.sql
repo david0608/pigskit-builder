@@ -1,3 +1,12 @@
+-- Shops errors.
+INSERT INTO errors (code, name, message) VALUES
+    ('C6001', 'shop_name_used', 'Shop name has been used.'),
+    ('C6003', 'shop_not_found', 'Shop not found.'),
+    ('C6009', 'shop_product_not_found', 'Product not found for the shop.'),
+    ('C6101', 'shop_user_update_authority_failed', 'Failed to update shop_user authority.');
+
+
+
 -- Shops table.
 CREATE TABLE shops (
     id                      UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -23,14 +32,6 @@ $$ LANGUAGE plpgsql;
 CREATE TRIGGER name_auto_upper
 BEFORE INSERT ON shops FOR EACH ROW
 EXECUTE PROCEDURE shop_name_auto_upper();
-
-
-
--- Shops errors.
-INSERT INTO errors (code, name, message) VALUES
-    ('C5001', 'shop_name_used', 'Shop name has been used.'),
-    ('C5003', 'shop_not_found', 'Shop not found.'),
-    ('C5009', 'shop_product_not_found', 'Product not found for the shop.');
 
 
 
@@ -327,12 +328,6 @@ CREATE TABLE shop_user (
     product_authority       PERMISSION_NN DEFAULT 'read-only',
     UNIQUE(shop_id, user_id)
 );
-
-
-
--- Shop_User errors.
-INSERT INTO errors (code, name, message) VALUES
-    ('C6001', 'shop_user_update_authority_failed', 'Failed to update shop_user authority.');
 
 
 
