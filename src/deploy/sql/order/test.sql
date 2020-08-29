@@ -6,8 +6,8 @@ DO $$
         shop2_id UUID;
         session_id UUID;
     BEGIN
-        INSERT INTO shops(name) VALUES ('shop1') RETURNING id INTO shop1_id;
-        INSERT INTO shops(name) VALUES ('shop2') RETURNING id INTO shop2_id;
+        INSERT INTO shops(name) VALUES ('shop test 1') RETURNING id INTO shop1_id;
+        INSERT INTO shops(name) VALUES ('shop test 2') RETURNING id INTO shop2_id;
 
         SELECT id INTO session_id FROM put_cart(session_id, shop1_id) AS id;
         RAISE INFO 'session_id: %', session_id;
@@ -24,9 +24,10 @@ ROLLBACK;
 
 
 
--- Test cart_create_item, cart_update_item, cart_delete_item and query_cart_items.
+-- Test cart_create_item, cart_update_item and cart_delete_item.
 BEGIN;
 DO $$
+    <<_>>
     DECLARE
         shop_id UUID;
         guest_session_id UUID;
@@ -53,7 +54,7 @@ DO $$
 
         cart_r RECORD;
     BEGIN
-        INSERT INTO shops(name) VALUES ('shop1') RETURNING id INTO shop_id;
+        INSERT INTO shops(name) VALUES ('shop test') RETURNING id INTO shop_id;
         guest_session_id := put_cart(null, shop_id);
 
         prod1_key := shop_create_product(
@@ -181,25 +182,47 @@ DO $$
 
         FOR cart_r IN
             WITH
-                items AS ( SELECT key, item FROM query_cart_items(guest_session_id, shop_id) ),
-                customizes AS ( SELECT key item_key, (query_product_item_customize_items(item)).* FROM items )
+                query_carts AS (
+                    SELECT * FROM cart t WHERE t.shop_id = _.shop_id AND t.guest_session_id = _.guest_session_id
+                ),
+                query_items AS (
+                    SELECT id cart_id, (each(items)).* FROM query_carts
+                ),
+                query_customizes AS (
+                    SELECT key item_key, (query_product_item_customize_items(value::PRODUCT_ITEM)).* FROM query_items
+                )
             SELECT
-                items.key,
-                (items.item).name,
-                (items.item).price,
-                (items.item).count,
-                (items.item).remark,
-                customizes.key cus_key,
-                (customizes.customize).name cus_name,
-                (customizes.customize).selection,
-                (customizes.customize).price sel_price
+                item_key,
+                (item).name,
+                (item).price,
+                (item).count,
+                (item).remark,
+                customize_key cus_key,
+                (customize).name cus_name,
+                (customize).selection,
+                (customize).price sel_price
             FROM
-                items LEFT JOIN customizes
+                query_carts
+            LEFT JOIN
+                (
+                    SELECT
+                        cart_id,
+                        query_items.key::UUID item_key,
+                        query_items.value::PRODUCT_ITEM item,
+                        query_customizes.key::UUID customize_key,
+                        customize
+                    FROM
+                        query_items
+                    LEFT JOIN
+                        query_customizes
+                    ON
+                        query_items.key = query_customizes.item_key
+                ) item_join_cus
             ON
-                items.key = customizes.item_key
+                query_carts.id = item_join_cus.cart_id
         LOOP
             RAISE INFO '%, %, %, %, %, %, %, %, %',
-                cart_r.key, cart_r.name, cart_r.price, cart_r.count, cart_r.remark, cart_r.cus_key, cart_r.cus_name, cart_r.selection, cart_r.sel_price;
+                cart_r.item_key, cart_r.name, cart_r.price, cart_r.count, cart_r.remark, cart_r.cus_key, cart_r.cus_name, cart_r.selection, cart_r.sel_price;
         END LOOP;
     END;
 $$ LANGUAGE plpgsql;
@@ -305,7 +328,7 @@ DO $$
                 order_number,
                 order_at,
                 order_items.key item_key,
-                ((order_items.value)::PRODUCT_ITEM).key prod_key,
+                ((order_items.value)::PRODUCT_ITEM).product_key prod_key,
                 ((order_items.value)::PRODUCT_ITEM).name prod_name,
                 ((order_items.value)::PRODUCT_ITEM).price prod_price,
                 ((order_items.value)::PRODUCT_ITEM).count count

@@ -59,31 +59,6 @@ CREATE OR REPLACE FUNCTION put_cart (
     END;
 $$ LANGUAGE plpgsql;
 
--- Query cart items.
-CREATE OR REPLACE FUNCTION query_cart_items (
-    guest_session_id UUID_NN,
-    shop_id UUID_NN
-) RETURNS TABLE (
-    key UUID_NN,
-    item PRODUCT_ITEM
-) AS $$
-    <<_>>
-    DECLARE
-        cart_id UUID;
-        items hstore;
-    BEGIN
-        cart_id := get_cart(guest_session_id, shop_id);
-
-        IF cart_id IS NULL THEN
-            PERFORM raise_error('cart_not_found');
-        END IF;
-
-        SELECT t.items INTO _.items FROM cart AS t WHERE t.id = cart_id;
-
-        RETURN QUERY SELECT ((each).key)::UUID_NN, ((each).value)::PRODUCT_ITEM FROM each(items);
-    END;
-$$ LANGUAGE plpgsql;
-
 -- Create an item for the cart.
 CREATE OR REPLACE FUNCTION cart_create_item (
     guest_session_id UUID_NN,
@@ -246,7 +221,7 @@ CREATE OR REPLACE FUNCTION create_order (
                 prod_item PRODUCT_ITEM := (item.value)::PRODUCT_ITEM;
                 prod PRODUCT;
             BEGIN
-                prod := shop_read_product(shop_id, prod_item.key);
+                prod := shop_read_product(shop_id, prod_item.product_key);
                 IF prod IS NULL THEN
                     PERFORM raise_error('order_product_not_found');
                 END IF;

@@ -186,6 +186,7 @@ $$ LANGUAGE plpgsql;
 CREATE TYPE CUSTOMIZE_ITEM AS (
     name                TEXT_NZ,
     selection           TEXT,
+    selection_key       UUID,
     price               INTEGER,
     order_at            TS_NN
 );
@@ -204,6 +205,7 @@ CREATE OR REPLACE FUNCTION customize_item_create (
                     cus.name,
                     NULL,
                     NULL,
+                    NULL,
                     now()
                 )::CUSTOMIZE_ITEM;
             ELSE
@@ -219,6 +221,7 @@ CREATE OR REPLACE FUNCTION customize_item_create (
             RETURN (
                 cus.name,
                 sel.name,
+                sel_key,
                 sel.price,
                 now()
             )::CUSTOMIZE_ITEM;
@@ -393,7 +396,7 @@ $$ LANGUAGE plpgsql;
 
 -- Product item type.
 CREATE TYPE PRODUCT_ITEM AS (
-    key                     UUID_NN,
+    product_key             UUID_NN,
     name                    TEXT_NN,
     price                   INT_NN,
     customizes              HSTORE_NN,
@@ -419,7 +422,7 @@ $$ LANGUAGE plpgsql;
 
 -- Create a new product item.
 CREATE OR REPLACE FUNCTION product_item_create (
-    key UUID_NN,
+    prod_key UUID_NN,
     prod PRODUCT_NN,
     count INT_NN,
     remark TEXT,
@@ -443,7 +446,7 @@ CREATE OR REPLACE FUNCTION product_item_create (
         END LOOP;
 
         RETURN (
-            key,
+            prod_key,
             prod.name,
             prod.price,
             customize_items,
