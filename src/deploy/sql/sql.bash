@@ -13,7 +13,6 @@ database_objs=(
     product
     shops
     order
-    stores
 )
 
 if [[ $1 == "add-all" ]]; then

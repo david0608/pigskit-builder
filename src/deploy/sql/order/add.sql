@@ -215,18 +215,14 @@ CREATE OR REPLACE FUNCTION create_order (
         IF items = '' THEN
             PERFORM raise_error('order_cart_empty');
         END IF;
-        
+
         FOR item IN SELECT * FROM each(items) LOOP
             DECLARE
                 prod_item PRODUCT_ITEM := (item.value)::PRODUCT_ITEM;
                 prod PRODUCT;
             BEGIN
                 prod := shop_read_product(shop_id, prod_item.product_key);
-                IF prod IS NULL THEN
-                    PERFORM raise_error('order_product_not_found');
-                END IF;
-
-                IF prod.latest_update > prod_item.order_at THEN
+                IF prod IS NULL OR prod.latest_update > prod_item.order_at THEN
                     PERFORM raise_error('order_item_expired');
                 END IF;
             END;

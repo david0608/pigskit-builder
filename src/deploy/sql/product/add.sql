@@ -387,6 +387,8 @@ CREATE OR REPLACE FUNCTION product_update (
         FOR cus_key, cus_payload IN SELECT key, value FROM jsonb_each(payload -> 'update') LOOP
             prod = product_update_customize(prod, cus_key, cus_payload);
         END LOOP;
+
+        prod.latest_update = now();
     END;
 $$ LANGUAGE plpgsql;
 
