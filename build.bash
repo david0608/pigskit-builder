@@ -22,11 +22,11 @@ pigskit=(
     app
     docker
     sql
+    storage
 )
 
-if [ ! -d ./pigskit ]; then
-    mkdir pigskit
-fi
+rm -rf pigskit
+mkdir pigskit
 
 for (( i = 0; i < ${#pigskit[*]}; i++ ))
 do
