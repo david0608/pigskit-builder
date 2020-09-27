@@ -4,8 +4,7 @@ function run_sql() {
 
 declare -a database_objs
 database_objs=(
-    inits
-    permission
+    types
     errors
     users
     sessions

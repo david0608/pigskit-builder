@@ -68,8 +68,8 @@ CREATE OR REPLACE FUNCTION create_shop (
         INSERT INTO shop_user (
             shop_id,
             user_id,
-            team_authority,
-            store_authority,
+            member_authority,
+            order_authority,
             product_authority
         ) VALUES (
             shop_id,
@@ -323,8 +323,8 @@ CREATE TABLE shop_user (
     id                      UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     shop_id                 UUID_NN REFERENCES shops(id),
     user_id                 UUID_NN REFERENCES users(id),
-    team_authority          PERMISSION_NN DEFAULT 'none',
-    store_authority         PERMISSION_NN DEFAULT 'read-only',
+    member_authority        PERMISSION_NN DEFAULT 'none',
+    order_authority         PERMISSION_NN DEFAULT 'read-only',
     product_authority       PERMISSION_NN DEFAULT 'read-only',
     UNIQUE(shop_id, user_id)
 );
@@ -363,7 +363,7 @@ CREATE OR REPLACE FUNCTION shop_user_create (
     member_id UUID_NN
 ) RETURNS void AS $$
     BEGIN
-        IF NOT check_shop_user_authority(shop_id, user_id, 'team_authority', 'all') THEN
+        IF NOT check_shop_user_authority(shop_id, user_id, 'member_authority', 'all') THEN
             PERFORM raise_error('permission_denied');
         END IF;
         INSERT INTO shop_user (shop_id, user_id) VALUES (shop_id, member_id);
@@ -383,7 +383,7 @@ CREATE OR REPLACE FUNCTION shop_user_update_authority (
     DECLARE
         updated UUID;
     BEGIN
-        IF NOT check_shop_user_authority(shop_id, user_id, 'team_authority', 'all') THEN
+        IF NOT check_shop_user_authority(shop_id, user_id, 'member_authority', 'all') THEN
             PERFORM raise_error('permission_denied');
         END IF;
 
