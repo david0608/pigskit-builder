@@ -1,5 +1,5 @@
 -- Errors table.
-CREATE TABLE errors (
+CREATE TABLE IF NOT EXISTS errors (
     code            TEXT PRIMARY KEY CHECK (LENGTH(code) = 5 AND code LIKE 'C%'),
     name            TEXT_NZ UNIQUE,
     message         TEXT_NZ

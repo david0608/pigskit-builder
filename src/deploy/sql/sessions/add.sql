@@ -1,5 +1,5 @@
 -- Sessions table.
-CREATE TABLE sessions (
+CREATE TABLE IF NOT EXISTS sessions (
     id                  UUID_NN PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id             UUID_NN REFERENCES users(id),
     latest_access       TS_NN DEFAULT NOW()

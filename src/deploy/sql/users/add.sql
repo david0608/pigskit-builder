@@ -1,5 +1,5 @@
 -- Users table.
-CREATE TABLE users (
+CREATE TABLE IF NOT EXISTS users (
     id              UUID_NN PRIMARY KEY DEFAULT uuid_generate_v4(),
     username        TEXT_NZ UNIQUE,
     password        TEXT_NZ,
@@ -11,7 +11,7 @@ CREATE TABLE users (
 
 
 -- User register session table.
-CREATE TABLE user_register_session (
+CREATE TABLE IF NOT EXISTS user_register_session (
     id              UUID_NN PRIMARY KEY,
     username        TEXT,
     password        TEXT,

@@ -11,7 +11,7 @@ INSERT INTO errors(code, name, message) VALUES
 
 
 -- Cart table.
-CREATE TABLE cart (
+CREATE TABLE IF NOT EXISTS cart (
     id                  UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     guest_session_id    UUID_NN REFERENCES guest_session(id),
     shop_id             UUID_NN REFERENCES shops(id),
@@ -185,7 +185,7 @@ $$ LANGUAGE plpgsql;
 
 
 -- Orders table.
-CREATE TABLE orders (
+CREATE TABLE IF NOT EXISTS orders (
     id                      UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     guest_session_id        UUID_NN REFERENCES guest_session(id),
     shop_id                 UUID_NN REFERENCES shops(id),

@@ -8,7 +8,7 @@ INSERT INTO errors (code, name, message) VALUES
 
 
 -- Shops table.
-CREATE TABLE shops (
+CREATE TABLE IF NOT EXISTS shops (
     id                      UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     name                    TEXT_NZ,
     name_upper              TEXT UNIQUE,
@@ -319,7 +319,7 @@ $$ LANGUAGE plpgsql;
 
 
 -- Shop_user table.
-CREATE TABLE shop_user (
+CREATE TABLE IF NOT EXISTS shop_user (
     id                      UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     shop_id                 UUID_NN REFERENCES shops(id),
     user_id                 UUID_NN REFERENCES users(id),
@@ -400,7 +400,7 @@ $$ LANGUAGE plpgsql;
 
 
 -- Shop order number sequence table.
-CREATE TABLE shop_order_number_sequence (
+CREATE TABLE IF NOT EXISTS shop_order_number_sequence (
     shop_id             UUID UNIQUE REFERENCES shops(id) NOT NULL,
     current_number      INTEGER DEFAULT 0
 );

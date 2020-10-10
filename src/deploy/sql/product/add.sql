@@ -153,8 +153,10 @@ CREATE OR REPLACE FUNCTION customize_update (
     payload JSONB
 ) AS $$
     DECLARE
+        selections_payload JSONB;
         sel_key UUID;
-        sel_payload JSONB;
+        create_payload JSONB;
+        update_payload JSONB;
     BEGIN
         IF payload ? 'name' THEN
             cus.name = payload ->> 'name';
@@ -164,17 +166,21 @@ CREATE OR REPLACE FUNCTION customize_update (
             cus.description = payload ->> 'description';
         END IF;
 
-        FOR sel_key IN SELECT jsonb_array_elements_text(payload -> 'delete') LOOP
-            cus = customize_delete_selection(cus, sel_key);
-        END LOOP;
+        IF payload ? 'selections' THEN
+            selections_payload = payload -> 'selections';
 
-        FOR sel_payload IN SELECT jsonb_array_elements(payload -> 'create') LOOP
-            cus = customize_create_selection(cus, sel_payload);
-        END LOOP;
+            FOR sel_key IN SELECT jsonb_array_elements_text(selections_payload -> 'delete') LOOP
+                cus = customize_delete_selection(cus, sel_key);
+            END LOOP;
 
-        FOR sel_key, sel_payload IN SELECT key, value FROM jsonb_each(payload -> 'update') LOOP
-            cus = customize_update_selection(cus, sel_key, sel_payload);
-        END LOOP;
+            FOR create_payload IN SELECT jsonb_array_elements(selections_payload -> 'create') LOOP
+                cus = customize_create_selection(cus, create_payload);
+            END LOOP;
+
+            FOR sel_key, update_payload IN SELECT key, value FROM jsonb_each(selections_payload -> 'update') LOOP
+                cus = customize_update_selection(cus, sel_key, update_payload);
+            END LOOP;
+        END IF;
     END;
 $$ LANGUAGE plpgsql;
 
@@ -353,8 +359,10 @@ CREATE OR REPLACE FUNCTION product_update (
     payload JSONB
 ) AS $$
     DECLARE
+        customizes_payload JSONB;
         cus_key UUID;
-        cus_payload JSONB;
+        create_payload JSONB;
+        update_payload JSONB;
     BEGIN
         IF payload ? 'name' THEN
             prod.name = payload ->> 'name';
@@ -376,17 +384,21 @@ CREATE OR REPLACE FUNCTION product_update (
             prod.has_picture = payload ->> 'has_picture';
         END IF;
 
-        FOR cus_key IN SELECT jsonb_array_elements_text(payload -> 'delete') LOOP
-            prod = product_delete_customize(prod, cus_key);
-        END LOOP;
+        IF payload ? 'customizes' THEN
+            customizes_payload = payload -> 'customizes';
 
-        FOR cus_payload IN SELECT jsonb_array_elements(payload -> 'create') LOOP
-            prod = product_create_customize(prod, cus_payload);
-        END LOOP;
+            FOR cus_key IN SELECT jsonb_array_elements_text(customizes_payload -> 'delete') LOOP
+                prod = product_delete_customize(prod, cus_key);
+            END LOOP;
 
-        FOR cus_key, cus_payload IN SELECT key, value FROM jsonb_each(payload -> 'update') LOOP
-            prod = product_update_customize(prod, cus_key, cus_payload);
-        END LOOP;
+            FOR create_payload IN SELECT jsonb_array_elements(customizes_payload -> 'create') LOOP
+                prod = product_create_customize(prod, create_payload);
+            END LOOP;
+
+            FOR cus_key, update_payload IN SELECT key, value FROM jsonb_each(customizes_payload -> 'update') LOOP
+                prod = product_update_customize(prod, cus_key, update_payload);
+            END LOOP;
+        END IF;
 
         prod.latest_update = now();
     END;

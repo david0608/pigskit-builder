@@ -1,5 +1,5 @@
 -- Guest session table.
-CREATE TABLE guest_session (
+CREATE TABLE IF NOT EXISTS guest_session (
     id                      UUID_NN PRIMARY KEY DEFAULT uuid_generate_v4(),
     latest_access           TS_NN DEFAULT now()
 );
