@@ -90,7 +90,7 @@ Ctrl+c && make kill                 # 終止服務
 
 ## 佈署服務
 
-上傳檔案與登入雲端主機須提供 SSH 金鑰，這裡默認金鑰位置為 ~/.ssh/AwsEcsKey.pem
+上傳檔案與登入雲端主機須提供主機名稱和 SSH 金鑰，這裡默認主機名稱的環境變數名稱為 AWS_NAME，金鑰位置為 ~/.ssh/AwsEcsKey.pem
 
 ```
 make awsscp                         # 上傳所需的檔案
